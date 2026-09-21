@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
+import '../core/animation/animation_utils.dart';
 import '../models/specialty_model.dart';
 
-class SpecialtyCard extends StatefulWidget {
+class SpecialtyCard extends StatelessWidget {
   final SpecialtyModel specialty;
   final VoidCallback onTap;
   final bool isSelected;
@@ -17,110 +18,84 @@ class SpecialtyCard extends StatefulWidget {
   });
 
   @override
-  State<SpecialtyCard> createState() => _SpecialtyCardState();
-}
-
-class _SpecialtyCardState extends State<SpecialtyCard> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 100),
-      lowerBound: 0.0,
-      upperBound: 0.06,
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.94).animate(_controller);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final s = widget.specialty;
+    final s = specialty;
 
-    return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) {
-        _controller.reverse();
-        widget.onTap();
-      },
-      onTapCancel: () => _controller.reverse(),
-      child: AnimatedBuilder(
-        animation: _scaleAnimation,
-        builder: (context, child) => Transform.scale(
-          scale: _scaleAnimation.value,
-          child: child,
+    return AppBouncyTouch(
+      scaleFactor: 0.94,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryLight : Colors.white.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.border.withValues(alpha: 0.6),
+            width: isSelected ? 1.5 : 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isSelected
+                  ? AppColors.primary.withValues(alpha: 0.12)
+                  : Colors.black.withValues(alpha: 0.02),
+              blurRadius: isSelected ? 12 : 6,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
-        child: Container(
-          decoration: BoxDecoration(
-            color: widget.isSelected ? AppColors.primaryLight : Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
-            border: widget.isSelected
-                ? Border.all(color: AppColors.primary, width: 1.5)
-                : null,
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  color: s.bgColor,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: s.iconColor.withValues(alpha: 0.18),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Icon(
-                    s.icon,
-                    color: s.iconColor,
-                    size: 28,
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: s.bgColor,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: s.iconColor.withValues(alpha: 0.22),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
+                ],
+              ),
+              child: Center(
+                child: Icon(
+                  s.icon,
+                  color: s.iconColor,
+                  size: 26,
                 ),
               ),
-              const SizedBox(height: 8),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              s.name,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
+                color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                height: 1.15,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (showSubtitle) ...[
+              const SizedBox(height: 3),
               Text(
-                s.name,
+                '${s.doctorCount} Doctors',
                 style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                  height: 1.15,
+                  fontSize: 11,
+                  color: AppColors.textTertiary,
+                  fontWeight: FontWeight.w500,
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
-              if (widget.showSubtitle) ...[
-                const SizedBox(height: 2),
-                Text(
-                  '${s.doctorCount} Doctors',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textTertiary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
             ],
-          ),
+          ],
         ),
       ),
     );

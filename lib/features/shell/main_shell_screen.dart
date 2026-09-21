@@ -23,17 +23,28 @@ class MainShellScreen extends ConsumerWidget {
     final currentTab = ref.watch(currentTabProvider);
 
     final List<Widget> pages = const [
-      HomeScreen(),
-      InPersonScreen(),
-      VideoConsultTabScreen(),
-      AccountScreen(),
+      HomeScreen(key: ValueKey('HomeScreen')),
+      InPersonScreen(key: ValueKey('InPersonScreen')),
+      VideoConsultTabScreen(key: ValueKey('VideoConsultTabScreen')),
+      AccountScreen(key: ValueKey('AccountScreen')),
     ];
 
     return Scaffold(
       extendBody: true,
-      body: IndexedStack(
-        index: currentTab,
-        children: pages,
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 280),
+        switchInCurve: Curves.easeOutQuad,
+        switchOutCurve: Curves.easeInQuad,
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.98, end: 1.0).animate(animation),
+              child: child,
+            ),
+          );
+        },
+        child: pages[currentTab],
       ),
       bottomNavigationBar: FloatingBottomNav(
         currentIndex: currentTab,

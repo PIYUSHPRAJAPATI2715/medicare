@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/routes/app_routes.dart';
+import '../../core/animation/animation_utils.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/custom_app_bar.dart';
 
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
@@ -11,75 +13,109 @@ class AccountScreen extends ConsumerWidget {
   void _showRoleSwitchDialog(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) {
-        return Padding(
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 20,
+                offset: Offset(0, -4),
+              ),
+            ],
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               const Text(
                 'Switch Application Role',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.3),
               ),
               const SizedBox(height: 6),
               const Text(
                 'Explore the complete role-based experience built in MediCare+.',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
               ),
-              const SizedBox(height: 16),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(color: AppColors.primaryLight, shape: BoxShape.circle),
-                  child: const Icon(Icons.person_rounded, color: AppColors.primary),
-                ),
-                title: const Text('Patient Mode', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Book doctor visits, video consults & history'),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+              const SizedBox(height: 18),
+              AppBouncyTouch(
                 onTap: () {
                   ref.read(authProvider.notifier).switchRole(UserRole.patient);
                   Navigator.pop(context);
                 },
-              ),
-              const Divider(color: AppColors.borderLight),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(color: Color(0xFFE0F2FE), shape: BoxShape.circle),
-                  child: const Icon(Icons.medical_services_rounded, color: Color(0xFF0284C7)),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  tileColor: AppColors.surfaceVariant.withValues(alpha: 0.5),
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(color: AppColors.primaryLight, shape: BoxShape.circle),
+                    child: const Icon(Icons.person_rounded, color: AppColors.primary),
+                  ),
+                  title: const Text('Patient Mode', style: TextStyle(fontWeight: FontWeight.w800)),
+                  subtitle: const Text('Book doctor visits, video consults & history'),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                 ),
-                title: const Text('Doctor Mode (Provider Portal)', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Manage patient appointments, earnings & video calls'),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+              ),
+              const SizedBox(height: 10),
+              AppBouncyTouch(
                 onTap: () {
                   ref.read(authProvider.notifier).switchRole(UserRole.doctor);
                   Navigator.pop(context);
                   Navigator.of(context).pushNamed(AppRoutes.doctorDashboard);
                 },
-              ),
-              const Divider(color: AppColors.borderLight),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(color: Color(0xFFFEF3C7), shape: BoxShape.circle),
-                  child: const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFFD97706)),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  tileColor: AppColors.surfaceVariant.withValues(alpha: 0.5),
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(color: Color(0xFFE0F2FE), shape: BoxShape.circle),
+                    child: const Icon(Icons.medical_services_rounded, color: Color(0xFF0284C7)),
+                  ),
+                  title: const Text('Doctor Mode (Provider Portal)', style: TextStyle(fontWeight: FontWeight.w800)),
+                  subtitle: const Text('Manage patient appointments, earnings & video calls'),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                 ),
-                title: const Text('Admin Panel UI', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('System analytics, doctor verification & metrics'),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+              ),
+              const SizedBox(height: 10),
+              AppBouncyTouch(
                 onTap: () {
                   ref.read(authProvider.notifier).switchRole(UserRole.admin);
                   Navigator.pop(context);
                   Navigator.of(context).pushNamed(AppRoutes.adminDashboard);
                 },
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  tileColor: AppColors.surfaceVariant.withValues(alpha: 0.5),
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(color: Color(0xFFFEF3C7), shape: BoxShape.circle),
+                    child: const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFFD97706)),
+                  ),
+                  title: const Text('Admin Panel UI', style: TextStyle(fontWeight: FontWeight.w800)),
+                  subtitle: const Text('System analytics, doctor verification & metrics'),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                ),
               ),
+              const SizedBox(height: 12),
             ],
           ),
         );
@@ -93,20 +129,15 @@ class AccountScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Account',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-        ),
+      appBar: CustomAppBar(
+        showBack: false,
+        title: 'Account',
         actions: [
           IconButton(
             icon: const Icon(Icons.switch_account_rounded, color: AppColors.primary),
             tooltip: 'Switch Role',
             onPressed: () => _showRoleSwitchDialog(context, ref),
           ),
-          const SizedBox(width: 8),
         ],
       ),
       body: SingleChildScrollView(
@@ -115,138 +146,146 @@ class AccountScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 1. Profile Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.border),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: Image.network(
-                      user.avatarUrl,
-                      width: 58,
-                      height: 58,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => const CircleAvatar(
-                        radius: 29,
-                        backgroundColor: AppColors.primaryLight,
-                        child: Icon(Icons.person, size: 36, color: AppColors.primary),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          user.phone,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pushNamed(AppRoutes.editProfile);
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    ),
-                    child: const Text(
-                      'EDIT',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // 2. Care Plan Banner
-            GestureDetector(
-              onTap: () {
-                Navigator.of(context).pushNamed(AppRoutes.carePlan);
-              },
+            StaggeredFadeSlide(
+              index: 0,
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1E3A8A), Color(0xFF2563EB)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(18),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primaryDark.withValues(alpha: 0.2),
-                      blurRadius: 10,
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: Image.network(
+                        user.avatarUrl,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => const CircleAvatar(
+                          radius: 30,
+                          backgroundColor: AppColors.primaryLight,
+                          child: Icon(Icons.person, size: 36, color: AppColors.primary),
+                        ),
                       ),
-                      child: const Icon(Icons.favorite_rounded, color: Colors.amber, size: 24),
                     ),
                     const SizedBox(width: 14),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Care Plan Active',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14.5,
+                            user.name,
+                            style: const TextStyle(
+                              fontSize: 17,
                               fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                              letterSpacing: -0.2,
                             ),
                           ),
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
-                            '12 FREE Appointments for a Year',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
+                            user.phone,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: AppColors.textSecondary,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.white70),
+                    AppBouncyTouch(
+                      onTap: () {
+                        Navigator.of(context).pushNamed(AppRoutes.editProfile);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text(
+                          'EDIT',
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: AppColors.primary),
+                        ),
+                      ),
+                    ),
                   ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // 2. Care Plan Banner
+            StaggeredFadeSlide(
+              index: 1,
+              child: AppBouncyTouch(
+                scaleFactor: 0.97,
+                onTap: () {
+                  Navigator.of(context).pushNamed(AppRoutes.carePlan);
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    gradient: AppColors.bannerGradient,
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primaryDark.withValues(alpha: 0.25),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(Icons.favorite_rounded, color: Colors.amber, size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Care Plan Active',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              '12 FREE Appointments for a Year',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.white70),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -254,195 +293,236 @@ class AccountScreen extends ConsumerWidget {
             const SizedBox(height: 24),
 
             // 3. My History Section
-            const Text(
-              'My History',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
+            StaggeredFadeSlide(
+              index: 2,
+              child: const Text(
+                'My History',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.2,
+                ),
               ),
             ),
             const SizedBox(height: 10),
 
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                children: [
-                  _accountNavTile(
-                    icon: Icons.apartment_rounded,
-                    title: 'In-Person Appointments',
-                    onTap: () {
-                      Navigator.of(context).pushNamed(AppRoutes.appointmentsHistory);
-                    },
-                  ),
-                  _divider(),
-                  _accountNavTile(
-                    icon: Icons.videocam_rounded,
-                    title: 'Video Consultations',
-                    onTap: () {
-                      Navigator.of(context).pushNamed(AppRoutes.appointmentsHistory);
-                    },
-                  ),
-                  _divider(),
-                  _accountNavTile(
-                    icon: Icons.people_outline_rounded,
-                    title: 'My Doctors',
-                    onTap: () {
-                      Navigator.of(context).pushNamed(AppRoutes.doctorList);
-                    },
-                  ),
-                  _divider(),
-                  _accountNavTile(
-                    icon: Icons.folder_shared_outlined,
-                    title: 'Medical Records & Prescriptions',
-                    onTap: () {
-                      Navigator.of(context).pushNamed(AppRoutes.chat);
-                    },
-                  ),
-                  _divider(),
-                  _accountNavTile(
-                    icon: Icons.payment_rounded,
-                    title: 'Payments & HealthCash',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('HealthCash Balance: ₹450 available')),
-                      );
-                    },
-                  ),
-                ],
+            StaggeredFadeSlide(
+              index: 3,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _accountNavTile(
+                      icon: Icons.apartment_rounded,
+                      title: 'In-Person Appointments',
+                      onTap: () {
+                        Navigator.of(context).pushNamed(AppRoutes.appointmentsHistory);
+                      },
+                    ),
+                    _divider(),
+                    _accountNavTile(
+                      icon: Icons.videocam_rounded,
+                      title: 'Video Consultations',
+                      onTap: () {
+                        Navigator.of(context).pushNamed(AppRoutes.appointmentsHistory);
+                      },
+                    ),
+                    _divider(),
+                    _accountNavTile(
+                      icon: Icons.people_outline_rounded,
+                      title: 'My Doctors',
+                      onTap: () {
+                        Navigator.of(context).pushNamed(AppRoutes.doctorList);
+                      },
+                    ),
+                    _divider(),
+                    _accountNavTile(
+                      icon: Icons.folder_shared_outlined,
+                      title: 'Medical Records & Prescriptions',
+                      onTap: () {
+                        Navigator.of(context).pushNamed(AppRoutes.chat);
+                      },
+                    ),
+                    _divider(),
+                    _accountNavTile(
+                      icon: Icons.payment_rounded,
+                      title: 'Payments & HealthCash',
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('HealthCash Balance: ₹450 available')),
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
 
             const SizedBox(height: 24),
 
             // 4. Role Switch Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.swap_horiz_rounded, color: AppColors.primary, size: 28),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Switch to Doctor or Admin',
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppColors.primaryDark),
-                        ),
-                        Text(
-                          'Test doctor consultation portal and admin analytics',
-                          style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                        ),
-                      ],
-                    ),
+            StaggeredFadeSlide(
+              index: 4,
+              child: AppBouncyTouch(
+                scaleFactor: 0.97,
+                onTap: () => _showRoleSwitchDialog(context, ref),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
                   ),
-                  ElevatedButton(
-                    onPressed: () => _showRoleSwitchDialog(context, ref),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    child: const Text('Switch', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.swap_horiz_rounded, color: AppColors.primary, size: 28),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Switch to Doctor or Admin',
+                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: AppColors.primaryDark),
+                            ),
+                            Text(
+                              'Test doctor consultation portal and admin analytics',
+                              style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text('Switch', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
 
             const SizedBox(height: 24),
 
             // 5. Settings Section
-            const Text(
-              'Settings',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
+            StaggeredFadeSlide(
+              index: 5,
+              child: const Text(
+                'Settings',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.2,
+                ),
               ),
             ),
             const SizedBox(height: 10),
 
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                children: [
-                  _accountNavTile(
-                    icon: Icons.language_rounded,
-                    title: 'Language',
-                    subtitle: 'English (Default)',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Language set to English')),
-                      );
-                    },
-                  ),
-                  _divider(),
-                  _accountNavTile(
-                    icon: Icons.notifications_none_rounded,
-                    title: 'Notifications',
-                    onTap: () {
-                      Navigator.of(context).pushNamed(AppRoutes.notifications);
-                    },
-                  ),
-                  _divider(),
-                  _accountNavTile(
-                    icon: Icons.help_outline_rounded,
-                    title: 'Help & Support',
-                    onTap: () {
-                      Navigator.of(context).pushNamed(AppRoutes.helpSupport);
-                    },
-                  ),
-                  _divider(),
-                  _accountNavTile(
-                    icon: Icons.info_outline_rounded,
-                    title: 'About MediCare+',
-                    subtitle: 'v1.0.0 (Production Build)',
-                    onTap: () {
-                      showAboutDialog(
-                        context: context,
-                        applicationName: 'MediCare+',
-                        applicationVersion: '1.0.0',
-                        applicationLegalese: '© 2026 MediCare+ Technologies Pvt Ltd.\nYour Health, Our Priority.',
-                      );
-                    },
-                  ),
-                ],
+            StaggeredFadeSlide(
+              index: 6,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _accountNavTile(
+                      icon: Icons.language_rounded,
+                      title: 'Language',
+                      subtitle: 'English (Default)',
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Language set to English')),
+                        );
+                      },
+                    ),
+                    _divider(),
+                    _accountNavTile(
+                      icon: Icons.notifications_none_rounded,
+                      title: 'Notifications',
+                      onTap: () {
+                        Navigator.of(context).pushNamed(AppRoutes.notifications);
+                      },
+                    ),
+                    _divider(),
+                    _accountNavTile(
+                      icon: Icons.help_outline_rounded,
+                      title: 'Help & Support',
+                      onTap: () {
+                        Navigator.of(context).pushNamed(AppRoutes.helpSupport);
+                      },
+                    ),
+                    _divider(),
+                    _accountNavTile(
+                      icon: Icons.info_outline_rounded,
+                      title: 'About MediCare+',
+                      subtitle: 'v1.0.0 (Production Build)',
+                      onTap: () {
+                        showAboutDialog(
+                          context: context,
+                          applicationName: 'MediCare+',
+                          applicationVersion: '1.0.0',
+                          applicationLegalese: '© 2026 MediCare+ Technologies Pvt Ltd.\nYour Health, Our Priority.',
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
 
             const SizedBox(height: 24),
 
             // Logout Button
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
+            StaggeredFadeSlide(
+              index: 7,
+              child: AppBouncyTouch(
+                onTap: () {
                   ref.read(authProvider.notifier).logout();
                   Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.login, (r) => false);
                 },
-                icon: const Icon(Icons.logout_rounded, color: AppColors.error, size: 18),
-                label: const Text('Logout', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w700)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.error),
+                child: Container(
+                  width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.error),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.logout_rounded, color: AppColors.error, size: 18),
+                      SizedBox(width: 8),
+                      Text('Logout', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w800, fontSize: 14)),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -458,24 +538,26 @@ class AccountScreen extends ConsumerWidget {
     String? subtitle,
     required VoidCallback onTap,
   }) {
-    return ListTile(
+    return AppBouncyTouch(
       onTap: onTap,
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceVariant.withValues(alpha: 0.6),
-          shape: BoxShape.circle,
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceVariant.withValues(alpha: 0.6),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 18, color: AppColors.textPrimary),
         ),
-        child: Icon(icon, size: 18, color: AppColors.textPrimary),
+        title: Text(
+          title,
+          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+        ),
+        subtitle: subtitle != null
+            ? Text(subtitle, style: const TextStyle(fontSize: 11.5, color: AppColors.textTertiary, fontWeight: FontWeight.w500))
+            : null,
+        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 13, color: AppColors.textTertiary),
       ),
-      title: Text(
-        title,
-        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-      ),
-      subtitle: subtitle != null
-          ? Text(subtitle, style: const TextStyle(fontSize: 11.5, color: AppColors.textTertiary))
-          : null,
-      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 13, color: AppColors.textTertiary),
     );
   }
 

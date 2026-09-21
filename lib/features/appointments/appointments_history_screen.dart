@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/routes/app_routes.dart';
+import '../../core/animation/animation_utils.dart';
 import '../../models/appointment_model.dart';
 import '../../providers/appointment_provider.dart';
 import '../../widgets/custom_app_bar.dart';
@@ -35,13 +36,13 @@ class _AppointmentsHistoryScreenState extends ConsumerState<AppointmentsHistoryS
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Cancel Appointment?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: const Text('Cancel Appointment?', style: TextStyle(fontWeight: FontWeight.w800)),
         content: Text('Are you sure you want to cancel the appointment with ${apt.doctor.name}? Full refund will be credited to your HealthCash wallet.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Keep Appointment'),
+            child: const Text('Keep Appointment', style: TextStyle(fontWeight: FontWeight.w700)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -51,8 +52,11 @@ class _AppointmentsHistoryScreenState extends ConsumerState<AppointmentsHistoryS
                 const SnackBar(content: Text('Appointment cancelled successfully.')),
               );
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -67,7 +71,7 @@ class _AppointmentsHistoryScreenState extends ConsumerState<AppointmentsHistoryS
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: CustomAppBar(
+      appBar: const CustomAppBar(
         title: 'My Appointments',
       ),
       body: Column(
@@ -77,22 +81,29 @@ class _AppointmentsHistoryScreenState extends ConsumerState<AppointmentsHistoryS
             color: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Container(
-              height: 42,
+              height: 44,
               decoration: BoxDecoration(
                 color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
               ),
               child: TabBar(
                 controller: _tabController,
                 indicatorSize: TabBarIndicatorSize.tab,
                 indicator: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(10),
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 labelColor: Colors.white,
                 unselectedLabelColor: AppColors.textSecondary,
-                labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
                 dividerColor: Colors.transparent,
                 tabs: const [
                   Tab(text: 'Upcoming'),
@@ -123,24 +134,27 @@ class _AppointmentsHistoryScreenState extends ConsumerState<AppointmentsHistoryS
                         itemCount: upcomingList.length,
                         itemBuilder: (context, index) {
                           final apt = upcomingList[index];
-                          return AppointmentCard(
-                            appointment: apt,
-                            onJoinConsultation: () {
-                              if (apt.type == ConsultationType.video) {
-                                Navigator.of(context).pushNamed(AppRoutes.videoCall);
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Hospital directions opened: ${apt.clinicName}')),
+                          return StaggeredFadeSlide(
+                            index: index,
+                            child: AppointmentCard(
+                              appointment: apt,
+                              onJoinConsultation: () {
+                                if (apt.type == ConsultationType.video) {
+                                  Navigator.of(context).pushNamed(AppRoutes.videoCall);
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Hospital directions opened: ${apt.clinicName}')),
+                                  );
+                                }
+                              },
+                              onReschedule: () {
+                                Navigator.of(context).pushNamed(
+                                  AppRoutes.doctorDetail,
+                                  arguments: apt.doctor.id,
                                 );
-                              }
-                            },
-                            onReschedule: () {
-                              Navigator.of(context).pushNamed(
-                                AppRoutes.doctorDetail,
-                                arguments: apt.doctor.id,
-                              );
-                            },
-                            onCancel: () => _showCancelDialog(apt),
+                              },
+                              onCancel: () => _showCancelDialog(apt),
+                            ),
                           );
                         },
                       ),
@@ -157,11 +171,14 @@ class _AppointmentsHistoryScreenState extends ConsumerState<AppointmentsHistoryS
                         itemCount: pastList.length,
                         itemBuilder: (context, index) {
                           final apt = pastList[index];
-                          return AppointmentCard(
-                            appointment: apt,
-                            onViewDetails: () {
-                              Navigator.of(context).pushNamed(AppRoutes.chat);
-                            },
+                          return StaggeredFadeSlide(
+                            index: index,
+                            child: AppointmentCard(
+                              appointment: apt,
+                              onViewDetails: () {
+                                Navigator.of(context).pushNamed(AppRoutes.chat);
+                              },
+                            ),
                           );
                         },
                       ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/animation/animation_utils.dart';
 import '../../models/appointment_model.dart';
 import '../../providers/doctor_provider.dart';
 import '../../providers/appointment_provider.dart';
@@ -36,60 +37,81 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
   void _showFilterBottomSheet() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) {
         return Consumer(
           builder: (context, ref, _) {
             final filter = ref.watch(doctorFilterProvider);
-            return Padding(
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 20,
+                    offset: Offset(0, -4),
+                  ),
+                ],
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.border,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
                         'Filter Doctors',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                        style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.3),
                       ),
-                      TextButton(
-                        onPressed: () {
+                      AppBouncyTouch(
+                        onTap: () {
                           ref.read(doctorFilterProvider.notifier).resetFilters();
                           Navigator.pop(context);
                         },
-                        child: const Text('Reset All'),
+                        child: const Text('Reset All', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   SwitchListTile(
-                    title: const Text('Online Now (Instant Consult)'),
+                    title: const Text('Online Now (Instant Consult)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
                     value: filter.onlineOnly,
                     activeThumbColor: AppColors.primary,
                     contentPadding: EdgeInsets.zero,
                     onChanged: (_) => ref.read(doctorFilterProvider.notifier).toggleOnlineOnly(),
                   ),
                   SwitchListTile(
-                    title: const Text('High Patient Rating (90%+)'),
+                    title: const Text('High Patient Rating (90%+)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
                     value: filter.highRatingOnly,
                     activeThumbColor: AppColors.primary,
                     contentPadding: EdgeInsets.zero,
                     onChanged: (_) => ref.read(doctorFilterProvider.notifier).toggleHighRating(),
                   ),
                   SwitchListTile(
-                    title: const Text('Experienced (10+ Years)'),
+                    title: const Text('Experienced (10+ Years)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
                     value: filter.experience10Plus,
                     activeThumbColor: AppColors.primary,
                     contentPadding: EdgeInsets.zero,
                     onChanged: (_) => ref.read(doctorFilterProvider.notifier).toggleExperience10Plus(),
                   ),
                   const SizedBox(height: 12),
-                  const Text('Consultation Language', style: TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
+                  const Text('Consultation Language', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                  const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
                     children: AppConstants.consultationLanguages.map((l) {
@@ -97,19 +119,29 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
                       return ChoiceChip(
                         label: Text(l),
                         selected: isSel,
+                        selectedColor: AppColors.primaryLight,
+                        labelStyle: TextStyle(
+                          color: isSel ? AppColors.primary : AppColors.textPrimary,
+                          fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                        ),
                         onSelected: (_) => ref.read(doctorFilterProvider.notifier).setLanguage(l),
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      minimumSize: const Size(double.infinity, 48),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  const SizedBox(height: 24),
+                  AppBouncyTouch(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        gradient: AppColors.primaryGradient,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Center(
+                        child: Text('Apply Filters', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+                      ),
                     ),
-                    child: const Text('Apply Filters', style: TextStyle(color: Colors.white)),
                   ),
                 ],
               ),
@@ -140,7 +172,7 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
           // Search + Toggle + Filters Bar Container
           Container(
             color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
             child: Column(
               children: [
                 // Search Field
@@ -151,7 +183,7 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
                   },
                   decoration: InputDecoration(
                     hintText: 'Search by doctor or specialty...',
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textTertiary, size: 20),
+                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary, size: 22),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear_rounded, size: 18),
@@ -162,11 +194,11 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
                           )
                         : null,
                     filled: true,
-                    fillColor: AppColors.surfaceVariant.withValues(alpha: 0.5),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                    fillColor: AppColors.surfaceVariant.withValues(alpha: 0.6),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: AppColors.border),
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
                     ),
                   ),
                 ),
@@ -178,25 +210,25 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Row(
                     children: [
                       Expanded(
-                        child: GestureDetector(
+                        child: AppBouncyTouch(
                           onTap: () {
                             ref.read(doctorFilterProvider.notifier).setConsultationMode('inPerson');
                           },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            padding: const EdgeInsets.symmetric(vertical: 9),
                             decoration: BoxDecoration(
                               color: isPhysical ? Colors.white : Colors.transparent,
-                              borderRadius: BorderRadius.circular(9),
+                              borderRadius: BorderRadius.circular(10),
                               boxShadow: isPhysical
                                   ? [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.05),
+                                        color: Colors.black.withValues(alpha: 0.06),
                                         blurRadius: 4,
                                         offset: const Offset(0, 2),
                                       ),
@@ -214,10 +246,10 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    'Physical Appointment',
+                                    'Physical Visit',
                                     style: TextStyle(
                                       fontSize: 12.5,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: FontWeight.w800,
                                       color: isPhysical ? AppColors.primary : AppColors.textSecondary,
                                     ),
                                   ),
@@ -228,21 +260,21 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
                         ),
                       ),
                       Expanded(
-                        child: GestureDetector(
+                        child: AppBouncyTouch(
                           onTap: () {
                             ref.read(doctorFilterProvider.notifier).setConsultationMode('video');
                           },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            padding: const EdgeInsets.symmetric(vertical: 9),
                             decoration: BoxDecoration(
                               color: !isPhysical ? AppColors.primary : Colors.transparent,
-                              borderRadius: BorderRadius.circular(9),
+                              borderRadius: BorderRadius.circular(10),
                               boxShadow: !isPhysical
                                   ? [
                                       BoxShadow(
-                                        color: AppColors.primary.withValues(alpha: 0.2),
-                                        blurRadius: 4,
+                                        color: AppColors.primary.withValues(alpha: 0.25),
+                                        blurRadius: 6,
                                         offset: const Offset(0, 2),
                                       ),
                                     ]
@@ -262,7 +294,7 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
                                     'Video Consult',
                                     style: TextStyle(
                                       fontSize: 12.5,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: FontWeight.w800,
                                       color: !isPhysical ? Colors.white : AppColors.textSecondary,
                                     ),
                                   ),
@@ -284,17 +316,28 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
                   child: Row(
                     children: [
                       // Filter icon button
-                      ActionChip(
-                        avatar: const Icon(Icons.tune_rounded, size: 14, color: AppColors.primary),
-                        label: const Text('Filter', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                        backgroundColor: Colors.white,
-                        side: const BorderSide(color: AppColors.border),
-                        onPressed: _showFilterBottomSheet,
+                      AppBouncyTouch(
+                        onTap: _showFilterBottomSheet,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.tune_rounded, size: 14, color: AppColors.primary),
+                              SizedBox(width: 6),
+                              Text('Filter', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                            ],
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 8),
                       // Instant Online Chip
                       FilterChip(
-                        label: const Text('Now or Later', style: TextStyle(fontSize: 12)),
+                        label: const Text('Online Now', style: TextStyle(fontSize: 12)),
                         selected: filter.onlineOnly,
                         selectedColor: AppColors.primaryLight,
                         checkmarkColor: AppColors.primary,
@@ -345,38 +388,47 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
                     children: [
                       // Section 1: Doctors Available Instantly (if any)
                       if (instantDocs.isNotEmpty && !isPhysical) ...[
-                        Row(
-                          children: [
-                            const Icon(Icons.bolt_rounded, size: 18, color: AppColors.primary),
-                            const SizedBox(width: 6),
-                            const Text(
-                              'Doctors Available Instantly',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.successLight,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                'Online from all over India',
+                        StaggeredFadeSlide(
+                          index: 0,
+                          child: Row(
+                            children: [
+                              const PulsingDot(size: 6, color: AppColors.success),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Doctors Available Instantly',
                                 style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.success,
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                  letterSpacing: -0.2,
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.successLight,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Online',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.success,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 12),
-                        ...instantDocs.map((doc) => DoctorCard(
+                        ...instantDocs.asMap().entries.map((entry) {
+                          final idx = entry.key;
+                          final doc = entry.value;
+                          return StaggeredFadeSlide(
+                            index: 1 + idx,
+                            child: DoctorCard(
                               doctor: doc,
                               isPhysicalMode: isPhysical,
                               onTap: () {
@@ -392,24 +444,35 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
                                     );
                                 Navigator.of(context).pushNamed(AppRoutes.booking);
                               },
-                            )),
+                            ),
+                          );
+                        }),
                         const SizedBox(height: 16),
                       ],
 
                       // Section 2: Doctors Available Later
                       if (laterDocs.isNotEmpty || isPhysical) ...[
                         if (!isPhysical && instantDocs.isNotEmpty) ...[
-                          const Text(
-                            'Doctors Available Later',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary,
+                          const StaggeredFadeSlide(
+                            index: 4,
+                            child: Text(
+                              'Doctors Available Later',
+                              style: TextStyle(
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                                letterSpacing: -0.2,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 12),
                         ],
-                        ...(isPhysical ? allFiltered : laterDocs).map((doc) => DoctorCard(
+                        ...(isPhysical ? allFiltered : laterDocs).asMap().entries.map((entry) {
+                          final idx = entry.key;
+                          final doc = entry.value;
+                          return StaggeredFadeSlide(
+                            index: 5 + idx,
+                            child: DoctorCard(
                               doctor: doc,
                               isPhysicalMode: isPhysical,
                               onTap: () {
@@ -432,7 +495,9 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
                                   SnackBar(content: Text('Calling ${doc.clinicName}...')),
                                 );
                               },
-                            )),
+                            ),
+                          );
+                        }),
                       ],
                     ],
                   ),
