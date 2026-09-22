@@ -16,3 +16,14 @@ services:
         sync: false
       - key: AGORA_APP_CERTIFICATE
         sync: false
+
+  - type: static
+    name: drconnects24-web-portal
+    env: static
+    rootDir: web-portal
+    buildCommand: npm install && npm run build
+    publishDir: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
