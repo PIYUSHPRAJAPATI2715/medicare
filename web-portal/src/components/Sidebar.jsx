@@ -12,11 +12,11 @@ import {
   Video,
   LogOut,
   ShieldCheck,
-  Activity,
-  ClipboardList
+  ClipboardList,
+  X
 } from 'lucide-react';
 
-export default function Sidebar() {
+export default function Sidebar({ isMobileOpen, onCloseMobile }) {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'admin';
 
@@ -38,20 +38,30 @@ export default function Sidebar() {
 
   const navItems = isAdmin ? adminNav : doctorNav;
 
-  return (
-    <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between hidden md:flex min-h-screen">
+  const sidebarContent = (
+    <div className="flex flex-col justify-between h-full">
       <div>
         {/* Brand Header */}
-        <div className="p-5 border-b border-slate-800 flex items-center gap-3">
-          <div className={`p-2.5 rounded-xl text-white ${isAdmin ? 'bg-amber-600' : 'bg-blue-600'}`}>
-            {isAdmin ? <ShieldCheck className="w-5 h-5" /> : <Stethoscope className="w-5 h-5" />}
+        <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-xl text-white ${isAdmin ? 'bg-amber-600' : 'bg-blue-600'}`}>
+              {isAdmin ? <ShieldCheck className="w-5 h-5" /> : <Stethoscope className="w-5 h-5" />}
+            </div>
+            <div>
+              <h2 className="text-base font-extrabold text-white tracking-tight">drconnects24</h2>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
+                {isAdmin ? 'Admin Control' : 'Doctor Portal'}
+              </span>
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-extrabold text-white tracking-tight">drconnects24</h2>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
-              {isAdmin ? 'Admin Control' : 'Doctor Portal'}
-            </span>
-          </div>
+          {onCloseMobile && (
+            <button
+              onClick={onCloseMobile}
+              className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         {/* Navigation Items */}
@@ -62,6 +72,7 @@ export default function Sidebar() {
               <NavLink
                 key={item.path}
                 to={item.path}
+                onClick={onCloseMobile}
                 className={({ isActive }) =>
                   `flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold transition-all ${
                     isActive
@@ -102,13 +113,41 @@ export default function Sidebar() {
         </div>
 
         <button
-          onClick={logout}
+          onClick={() => {
+            if (onCloseMobile) onCloseMobile();
+            logout();
+          }}
           className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl text-xs font-bold transition"
         >
           <LogOut className="w-3.5 h-3.5" />
           Sign Out
         </button>
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <aside className="w-64 bg-slate-900 border-r border-slate-800 hidden md:flex flex-col justify-between min-h-screen sticky top-0 h-screen">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile Drawer Overlay & Sheet */}
+      {isMobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"
+            onClick={onCloseMobile}
+          />
+
+          {/* Drawer Sheet */}
+          <div className="relative w-72 max-w-[80vw] bg-slate-900 border-r border-slate-800 h-full shadow-2xl z-10 flex flex-col">
+            {sidebarContent}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -34,7 +34,33 @@ export default function UsersPage() {
         />
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Mobile Card List (< 768px) */}
+      <div className="md:hidden space-y-3">
+        {filtered.map((u) => (
+          <div key={u.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <img src={u.avatarUrl} alt={u.name} className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">{u.name}</h3>
+                  <p className="text-xs text-slate-500 font-medium">{u.email}</p>
+                </div>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 capitalize">
+                {u.status || 'Active'}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-100 font-medium text-slate-600">
+              <span>Phone: {u.phone}</span>
+              <span className="font-semibold text-slate-800">{u.currentCity || 'Jaipur'}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop Table (>= 768px) */}
+      <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
@@ -68,6 +94,7 @@ export default function UsersPage() {
           </tbody>
         </table>
       </div>
+
     </div>
   );
 }

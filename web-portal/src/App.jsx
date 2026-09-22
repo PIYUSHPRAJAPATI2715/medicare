@@ -21,22 +21,25 @@ import VideoCallRoomPage from './pages/doctor/VideoCallRoomPage';
 
 function ProtectedLayout({ children }) {
   const { user } = useAuth();
+  const [isMobileOpen, setIsMobileOpen] = React.useState(false);
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      <Sidebar />
+      <Sidebar isMobileOpen={isMobileOpen} onCloseMobile={() => setIsMobileOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
-        <Navbar />
-        <main className="p-6 flex-1 overflow-y-auto">
+        <Navbar onToggleMobileMenu={() => setIsMobileOpen(!isMobileOpen)} />
+        <main className="p-4 sm:p-6 flex-1 overflow-y-auto">
           {children}
         </main>
       </div>
     </div>
   );
 }
+
 
 export default function App() {
   return (

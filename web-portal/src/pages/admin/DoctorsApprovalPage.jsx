@@ -77,8 +77,53 @@ export default function DoctorsApprovalPage() {
         />
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Mobile Card List (< 768px) */}
+      <div className="md:hidden space-y-3">
+        {filtered.map((doc) => (
+          <div key={doc.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <img src={doc.imageUrl} alt={doc.name} className="w-11 h-11 rounded-full object-cover border border-slate-200" />
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-sm">{doc.name}</h3>
+                  <p className="text-xs text-slate-500 font-medium">{doc.specialty} · {doc.qualification}</p>
+                </div>
+              </div>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold capitalize ${
+                doc.verificationStatus === 'approved'
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : doc.verificationStatus === 'rejected'
+                  ? 'bg-red-100 text-red-800'
+                  : 'bg-amber-100 text-amber-800'
+              }`}>
+                {doc.verificationStatus || 'approved'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">License No</span>
+                <p className="font-mono font-bold text-slate-800">{doc.medicalLicenseNo || 'MCI-REG-8821'}</p>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Fee</span>
+                <p className="font-extrabold text-slate-900">₹{doc.consultationFee}</p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSelectedDoctor(doc)}
+              className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
+            >
+              <FileText className="w-4 h-4" />
+              Inspect Credentials & Documents
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop Table (>= 768px) */}
+      <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
@@ -136,6 +181,7 @@ export default function DoctorsApprovalPage() {
           </tbody>
         </table>
       </div>
+
 
       {/* Document Inspection Modal */}
       {selectedDoctor && (
