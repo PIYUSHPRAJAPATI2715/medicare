@@ -372,54 +372,6 @@ class AccountScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // 4. Role Switch Card
-            StaggeredFadeSlide(
-              index: 4,
-              child: AppBouncyTouch(
-                scaleFactor: 0.97,
-                onTap: () => _showRoleSwitchDialog(context, ref),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.swap_horiz_rounded, color: AppColors.primary, size: 28),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Switch to Doctor or Admin',
-                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: AppColors.primaryDark),
-                            ),
-                            Text(
-                              'Test doctor consultation portal and admin analytics',
-                              style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Text('Switch', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
             // 5. Settings Section
             StaggeredFadeSlide(
               index: 5,

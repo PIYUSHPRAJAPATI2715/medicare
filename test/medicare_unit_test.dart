@@ -6,6 +6,8 @@ import 'package:medicare_plus/providers/auth_provider.dart';
 import 'package:medicare_plus/providers/doctor_provider.dart';
 import 'package:medicare_plus/providers/appointment_provider.dart';
 import 'package:medicare_plus/providers/chat_provider.dart';
+import 'package:flutter/material.dart';
+import 'package:medicare_plus/widgets/floating_bottom_nav.dart';
 import 'package:medicare_plus/data/mock/mock_data.dart';
 
 void main() {
@@ -105,6 +107,48 @@ void main() {
       expect(updatedMessages.length, initialCount + 1);
       expect(updatedMessages.last.text, 'I need medical advice');
       expect(updatedMessages.last.isDoctor, false);
+    });
+  });
+
+  group('FloatingBottomNav Widget Tests', () {
+    testWidgets('Displays all 4 labels in column layout and supports switching', (tester) async {
+      int selectedIndex = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            bottomNavigationBar: StatefulBuilder(
+              builder: (context, setState) {
+                return FloatingBottomNav(
+                  currentIndex: selectedIndex,
+                  onTap: (index) {
+                    setState(() {
+                      selectedIndex = index;
+                    });
+                  },
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      // All 4 labels must always show simultaneously
+      expect(find.text('Home'), findsOneWidget);
+      expect(find.text('In-Person'), findsOneWidget);
+      expect(find.text('Video Consult'), findsOneWidget);
+      expect(find.text('Account'), findsOneWidget);
+
+      // Tap on Video Consult
+      await tester.tap(find.text('Video Consult'));
+      await tester.pumpAndSettle();
+
+      expect(selectedIndex, 2);
+
+      // All 4 labels still show simultaneously after switching
+      expect(find.text('Home'), findsOneWidget);
+      expect(find.text('In-Person'), findsOneWidget);
+      expect(find.text('Video Consult'), findsOneWidget);
+      expect(find.text('Account'), findsOneWidget);
     });
   });
 }

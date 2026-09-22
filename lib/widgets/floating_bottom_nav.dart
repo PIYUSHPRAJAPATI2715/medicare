@@ -5,9 +5,16 @@ import '../core/animation/animation_utils.dart';
 
 class NavItemData {
   final IconData icon;
+  final IconData? activeIcon;
   final String label;
 
-  const NavItemData({required this.icon, required this.label});
+  const NavItemData({
+    required this.icon,
+    this.activeIcon,
+    required this.label,
+  });
+
+  IconData get effectiveActiveIcon => activeIcon ?? icon;
 }
 
 class FloatingBottomNav extends StatelessWidget {
@@ -21,10 +28,26 @@ class FloatingBottomNav extends StatelessWidget {
   });
 
   static const List<NavItemData> _items = [
-    NavItemData(icon: Icons.home_rounded, label: 'Home'),
-    NavItemData(icon: Icons.apartment_rounded, label: 'In-Person'),
-    NavItemData(icon: Icons.videocam_rounded, label: 'Video Consult'),
-    NavItemData(icon: Icons.person_rounded, label: 'Account'),
+    NavItemData(
+      icon: Icons.home_outlined,
+      activeIcon: Icons.home_rounded,
+      label: 'Home',
+    ),
+    NavItemData(
+      icon: Icons.apartment_outlined,
+      activeIcon: Icons.apartment_rounded,
+      label: 'In-Person',
+    ),
+    NavItemData(
+      icon: Icons.videocam_outlined,
+      activeIcon: Icons.videocam_rounded,
+      label: 'Video Consult',
+    ),
+    NavItemData(
+      icon: Icons.person_outline_rounded,
+      activeIcon: Icons.person_rounded,
+      label: 'Account',
+    ),
   ];
 
   @override
@@ -35,135 +58,172 @@ class FloatingBottomNav extends StatelessWidget {
       padding: EdgeInsets.only(
         left: 16,
         right: 16,
-        bottom: bottomPadding > 0 ? bottomPadding + 6 : 14,
+        bottom: bottomPadding > 0 ? bottomPadding + 4 : 14,
         top: 6,
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(32),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            height: 64,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.88),
-              borderRadius: BorderRadius.circular(32),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.6),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 24,
-                  spreadRadius: 0,
-                  offset: const Offset(0, 8),
-                ),
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.12),
-                  blurRadius: 16,
-                  spreadRadius: -2,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            // Deep ambient dark elevation shadow
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.14),
+              blurRadius: 28,
+              spreadRadius: 1,
+              offset: const Offset(0, 10),
             ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final totalWidth = constraints.maxWidth;
-                final itemWidth = totalWidth / _items.length;
+            // Medical primary blue ambient glow
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.22),
+              blurRadius: 24,
+              spreadRadius: -2,
+              offset: const Offset(0, 6),
+            ),
+            // Crisp grounding contact shadow
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+              blurRadius: 8,
+              spreadRadius: 0,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Container(
+              height: 68,
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.94),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  width: 1.5,
+                ),
+              ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final totalWidth = constraints.maxWidth;
+                  final itemWidth = totalWidth / _items.length;
 
-                return Stack(
-                  children: [
-                    // Animated sliding background pill indicator
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 320),
-                      curve: Curves.fastOutSlowIn,
-                      left: currentIndex * itemWidth + 4,
-                      top: 2,
-                      bottom: 2,
-                      width: itemWidth - 8,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              AppColors.primaryLight,
-                              AppColors.primaryLight.withValues(alpha: 0.8),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.15),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                  return Stack(
+                    children: [
+                      // Smooth animated sliding background pill
+                      AnimatedPositioned(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.fastOutSlowIn,
+                        left: currentIndex * itemWidth + 3,
+                        top: 3,
+                        bottom: 3,
+                        width: itemWidth - 6,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.primaryLight,
+                                AppColors.primaryLight.withValues(alpha: 0.6),
+                              ],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Nav Items Row
-                    Row(
-                      children: List.generate(_items.length, (index) {
-                        final isSelected = currentIndex == index;
-                        final item = _items[index];
-
-                        return Expanded(
-                          child: AppBouncyTouch(
-                            scaleFactor: 0.92,
-                            onTap: () => onTap(index),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 250),
-                              alignment: Alignment.center,
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  AnimatedScale(
-                                    scale: isSelected ? 1.15 : 1.0,
-                                    duration: const Duration(milliseconds: 250),
-                                    curve: Curves.easeOutBack,
-                                    child: Icon(
-                                      item.icon,
-                                      size: 22,
-                                      color: isSelected
-                                          ? AppColors.primary
-                                          : AppColors.textTertiary,
-                                    ),
-                                  ),
-                                  AnimatedCrossFade(
-                                    firstChild: const SizedBox.shrink(),
-                                    secondChild: Padding(
-                                      padding: const EdgeInsets.only(left: 6),
-                                      child: Text(
-                                        item.label,
-                                        style: const TextStyle(
-                                          color: AppColors.primary,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 12,
-                                          letterSpacing: -0.2,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    crossFadeState: isSelected
-                                        ? CrossFadeState.showSecond
-                                        : CrossFadeState.showFirst,
-                                    duration: const Duration(milliseconds: 200),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: AppColors.primary.withValues(alpha: 0.16),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withValues(alpha: 0.10),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: Container(
+                              margin: const EdgeInsets.only(top: 3),
+                              width: 18,
+                              height: 2.5,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(2),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.primary.withValues(alpha: 0.4),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
                                   ),
                                 ],
                               ),
                             ),
                           ),
-                        );
-                      }),
-                    ),
-                  ],
-                );
-              },
+                        ),
+                      ),
+
+                      // Nav Items in vertical column layout
+                      Row(
+                        children: List.generate(_items.length, (index) {
+                          final isSelected = currentIndex == index;
+                          final item = _items[index];
+
+                          return Expanded(
+                            child: AppBouncyTouch(
+                              scaleFactor: 0.93,
+                              onTap: () => onTap(index),
+                              child: Container(
+                                color: Colors.transparent,
+                                alignment: Alignment.center,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const SizedBox(height: 3),
+                                    AnimatedScale(
+                                      scale: isSelected ? 1.12 : 1.0,
+                                      duration: const Duration(milliseconds: 250),
+                                      curve: Curves.easeOutBack,
+                                      child: Icon(
+                                        isSelected ? item.effectiveActiveIcon : item.icon,
+                                        size: 22,
+                                        color: isSelected
+                                            ? AppColors.primary
+                                            : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    AnimatedDefaultTextStyle(
+                                      duration: const Duration(milliseconds: 200),
+                                      curve: Curves.easeInOut,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? AppColors.primary
+                                            : const Color(0xFF64748B),
+                                        fontWeight: isSelected
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                        fontSize: 11,
+                                        letterSpacing: -0.2,
+                                      ),
+                                      child: Text(
+                                        item.label,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
         ),

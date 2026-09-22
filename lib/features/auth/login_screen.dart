@@ -238,7 +238,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     );
                   },
                   child: const Text(
-                    'Forgot?',
+                    'Forgot Password?',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -345,31 +345,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 12),
 
               // Fast Switch Demo Helpers
-              Center(
-                child: Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    ActionChip(
-                      avatar: const Icon(Icons.person, size: 14, color: AppColors.primary),
-                      label: const Text('Demo Patient', style: TextStyle(fontSize: 11)),
-                      onPressed: _quickLoginAsPatient,
-                    ),
-                    ActionChip(
-                      avatar: const Icon(Icons.medical_services, size: 14, color: AppColors.secondary),
-                      label: const Text('Demo Doctor', style: TextStyle(fontSize: 11)),
-                      onPressed: _quickLoginAsDoctor,
-                    ),
-                    ActionChip(
-                      avatar: const Icon(Icons.admin_panel_settings, size: 14, color: AppColors.warning),
-                      label: const Text('Admin Panel', style: TextStyle(fontSize: 11)),
-                      onPressed: _quickAdminPreview,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
+
             ],
           ),
         ),
