@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/doctor_model.dart';
 import '../../data/mock/mock_data.dart';
+import '../services/api_service.dart';
 
 class DoctorFilterState {
   final String searchQuery;
@@ -107,10 +108,16 @@ class DoctorNotifier extends Notifier<DoctorFilterState> {
 
 final doctorFilterProvider = NotifierProvider<DoctorNotifier, DoctorFilterState>(DoctorNotifier.new);
 
+// Dynamic Doctors Provider via ApiService
+final allDoctorsProvider = FutureProvider<List<DoctorModel>>((ref) async {
+  return await ApiService.fetchDoctors();
+});
+
 // Filtered doctors list provider
 final filteredDoctorsProvider = Provider<List<DoctorModel>>((ref) {
   final filter = ref.watch(doctorFilterProvider);
-  final all = MockData.doctors;
+  final asyncDoctors = ref.watch(allDoctorsProvider);
+  final all = asyncDoctors.value ?? MockData.doctors;
 
   return all.where((doc) {
     // Mode filter
@@ -166,9 +173,12 @@ final laterDoctorsProvider = Provider<List<DoctorModel>>((ref) {
 
 // Doctor by ID
 final doctorByIdProvider = Provider.family<DoctorModel?, String>((ref, id) {
+  final asyncDoctors = ref.watch(allDoctorsProvider);
+  final all = asyncDoctors.value ?? MockData.doctors;
   try {
-    return MockData.doctors.firstWhere((d) => d.id == id);
+    return all.firstWhere((d) => d.id == id);
   } catch (_) {
     return null;
   }
 });
+

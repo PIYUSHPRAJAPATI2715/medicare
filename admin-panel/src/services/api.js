@@ -15,13 +15,20 @@ export async function fetchApi(endpoint, options = {}) {
 
 export const apiService = {
   getAnalytics: () => fetchApi('/analytics'),
+
   getUsers: () => fetchApi('/users'),
   createUser: (data) => fetchApi('/users', { method: 'POST', body: JSON.stringify(data) }),
   updateUser: (id, data) => fetchApi(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteUser: (id) => fetchApi(`/users/${id}`, { method: 'DELETE' }),
 
-  getDoctors: () => fetchApi('/doctors'),
+  getDoctors: (all = true) => fetchApi(`/doctors?all=${all}`),
+  getPendingDoctors: () => fetchApi('/doctors/pending'),
+  verifyDoctor: (id, action, rejectionNotes) => fetchApi(`/doctors/${id}/verify`, {
+    method: 'PUT',
+    body: JSON.stringify({ action, rejectionNotes }),
+  }),
   createDoctor: (data) => fetchApi('/doctors', { method: 'POST', body: JSON.stringify(data) }),
+  registerDoctor: (data) => fetchApi('/auth/doctor-register', { method: 'POST', body: JSON.stringify(data) }),
   updateDoctor: (id, data) => fetchApi(`/doctors/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteDoctor: (id) => fetchApi(`/doctors/${id}`, { method: 'DELETE' }),
 

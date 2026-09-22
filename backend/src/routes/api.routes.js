@@ -11,6 +11,11 @@ router.post('/agora/rtm-token', agoraController.generateRtmToken);
 // --- ANALYTICS ---
 router.get('/analytics', adminController.getAnalytics);
 
+// --- DOCTOR REGISTRATION & ADMIN VERIFICATION ---
+router.post('/auth/doctor-register', adminController.registerDoctor);
+router.get('/doctors/pending', adminController.getPendingDoctors);
+router.put('/doctors/:id/verify', adminController.verifyDoctor);
+
 // --- USERS ---
 router.get('/users', adminController.getUsers);
 router.post('/users', adminController.createUser);

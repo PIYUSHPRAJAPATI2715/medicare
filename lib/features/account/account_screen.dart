@@ -97,6 +97,26 @@ class AccountScreen extends ConsumerWidget {
               const SizedBox(height: 10),
               AppBouncyTouch(
                 onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).pushNamed(AppRoutes.doctorRegister);
+                },
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  tileColor: AppColors.primaryLight.withValues(alpha: 0.6),
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                    child: const Icon(Icons.how_to_reg_rounded, color: Colors.white),
+                  ),
+                  title: const Text('Register as Doctor', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.primaryDark)),
+                  subtitle: const Text('Submit medical license & degree docs for admin verification'),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.primary),
+                ),
+              ),
+              const SizedBox(height: 10),
+              AppBouncyTouch(
+                onTap: () {
                   ref.read(authProvider.notifier).switchRole(UserRole.admin);
                   Navigator.pop(context);
                   Navigator.of(context).pushNamed(AppRoutes.adminDashboard);
@@ -116,6 +136,7 @@ class AccountScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 12),
+
             ],
           ),
         );

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Stethoscope, Calendar, Video, IndianRupee, Star, CircleDot, Clock, ArrowRight } from 'lucide-react';
+import { Stethoscope, Calendar, Video, IndianRupee, Star, CircleDot, Clock, AlertTriangle, CheckCircle, ShieldAlert } from 'lucide-react';
 import { doctorApiService } from '../services/api';
 
 export default function DoctorDashboardPage({ onStartCall }) {
@@ -33,6 +33,27 @@ export default function DoctorDashboardPage({ onStartCall }) {
 
   return (
     <div className="space-y-6">
+      {/* Verification Status Alert Banner */}
+      {doctor.verificationStatus === 'pending' && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-amber-900 flex items-center gap-3">
+          <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0" />
+          <div className="flex-1">
+            <h4 className="font-extrabold text-sm text-amber-900">Medical Licensing Verification Under Review</h4>
+            <p className="text-xs text-amber-800 mt-0.5">Your submitted Medical License ({doctor.medicalLicenseNo}) and degree certificates are currently being reviewed by MediCare+ Admin.</p>
+          </div>
+        </div>
+      )}
+
+      {doctor.verificationStatus === 'rejected' && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-red-900 flex items-center gap-3">
+          <ShieldAlert className="w-6 h-6 text-red-600 shrink-0" />
+          <div className="flex-1">
+            <h4 className="font-extrabold text-sm text-red-900">Verification Action Required</h4>
+            <p className="text-xs text-red-800 mt-0.5">Admin Feedback: {doctor.rejectionNotes || 'License documentation verification failed. Please re-upload clear degree scans.'}</p>
+          </div>
+        </div>
+      )}
+
       {/* Doctor Profile Banner */}
       <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 rounded-2xl p-6 text-white shadow-xl shadow-blue-500/10 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
@@ -40,10 +61,18 @@ export default function DoctorDashboardPage({ onStartCall }) {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-extrabold">{doctor.name}</h1>
-              <span className="px-2.5 py-0.5 bg-emerald-400/20 text-emerald-300 text-xs font-bold rounded-lg border border-emerald-400/30">Verified Provider</span>
+              {doctor.isVerified ? (
+                <span className="px-2.5 py-0.5 bg-emerald-400/20 text-emerald-300 text-xs font-bold rounded-lg border border-emerald-400/30 flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3 text-emerald-400" /> Verified Provider
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 bg-amber-400/20 text-amber-300 text-xs font-bold rounded-lg border border-amber-400/30">
+                  Verification Pending
+                </span>
+              )}
             </div>
             <p className="text-blue-100 text-sm mt-0.5">{doctor.specialty} • {doctor.qualification}</p>
-            <p className="text-xs text-blue-200 mt-1">{doctor.clinicName} ({doctor.clinicAddress})</p>
+            <p className="text-xs text-blue-200 mt-1">Council Reg: {doctor.medicalLicenseNo} ({doctor.stateMedicalCouncil})</p>
           </div>
         </div>
 

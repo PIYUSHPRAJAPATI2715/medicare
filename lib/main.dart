@@ -22,8 +22,10 @@ import 'features/account/edit_profile_screen.dart';
 import 'features/account/care_plan_screen.dart';
 import 'features/account/notifications_screen.dart';
 import 'features/account/help_support_screen.dart';
+import 'features/auth/doctor_registration_screen.dart';
 import 'features/doctor_dashboard/doctor_dashboard_screen.dart';
 import 'features/admin/admin_dashboard_screen.dart';
+
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -88,8 +90,11 @@ class MediCareApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const HelpSupportScreen());
           case AppRoutes.doctorDashboard:
             return MaterialPageRoute(builder: (_) => const DoctorDashboardScreen());
+          case AppRoutes.doctorRegister:
+            return MaterialPageRoute(builder: (_) => const DoctorRegistrationScreen());
           case AppRoutes.adminDashboard:
             return MaterialPageRoute(builder: (_) => const AdminDashboardScreen());
+
           default:
             return MaterialPageRoute(builder: (_) => const MainShellScreen());
         }

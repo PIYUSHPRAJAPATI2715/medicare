@@ -1,5 +1,120 @@
 const db = require('../models/data_store');
 
+// --- DOCTOR REGISTRATION & ADMIN VERIFICATION ---
+exports.registerDoctor = (req, res) => {
+  const {
+    name,
+    email,
+    phone,
+    specialty,
+    qualification,
+    experienceYears,
+    consultationFee,
+    clinicName,
+    clinicAddress,
+    medicalLicenseNo,
+    stateMedicalCouncil,
+    qualificationCertUrl,
+    idProofUrl,
+    clinicAddressProofUrl,
+  } = req.body;
+
+  const docId = `d${Date.now()}`;
+  const userId = `u${Date.now()}`;
+
+  const newDoctor = {
+    id: docId,
+    name: name || 'Dr. Practitioner',
+    specialty: specialty || 'General Physician',
+    qualification: qualification || 'MBBS',
+    experienceYears: Number(experienceYears) || 3,
+    experienceText: `${experienceYears || 3} yrs exp`,
+    ratingPercentage: 100,
+    patientStoriesCount: 0,
+    consultationFee: Number(consultationFee) || 500,
+    imageUrl: req.body.imageUrl || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400',
+    isOnline: false,
+    allowsPhysical: true,
+    allowsVideo: true,
+    isVerified: false,
+    verificationStatus: 'pending',
+    medicalLicenseNo: medicalLicenseNo || 'MCI/2026/PENDING',
+    stateMedicalCouncil: stateMedicalCouncil || 'Medical Council of India',
+    qualificationCertUrl: qualificationCertUrl || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600',
+    idProofUrl: idProofUrl || 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600',
+    clinicAddressProofUrl: clinicAddressProofUrl || 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=600',
+    clinicName: clinicName || 'Health Clinic',
+    clinicAddress: clinicAddress || 'Jaipur',
+    distanceKm: 2.0,
+    languages: ['English', 'Hindi'],
+    aboutText: `${name} is a medical specialist registered with ${stateMedicalCouncil}.`,
+    services: ['General Consultation', 'Telehealth Care'],
+  };
+
+  const newUser = {
+    id: userId,
+    name: name || 'Doctor',
+    email: email || `dr.${docId}@medicare.com`,
+    phone: phone || '+91 90000 00000',
+    role: 'doctor',
+    status: 'pending_verification',
+    doctorId: docId,
+    createdAt: new Date().toISOString(),
+    avatarUrl: newDoctor.imageUrl,
+  };
+
+  db.doctors.push(newDoctor);
+  db.users.push(newUser);
+
+  res.json({
+    success: true,
+    message: 'Doctor registration submitted successfully! Under review by MediCare+ Admin.',
+    data: { doctor: newDoctor, user: newUser },
+  });
+};
+
+exports.getPendingDoctors = (req, res) => {
+  const pending = db.doctors.filter(d => d.verificationStatus === 'pending' || !d.isVerified);
+  res.json({ success: true, count: pending.length, data: pending });
+};
+
+exports.verifyDoctor = (req, res) => {
+  const { id } = req.params;
+  const { action, rejectionNotes } = req.body; // 'approve' or 'reject'
+
+  const idx = db.doctors.findIndex(d => d.id === id);
+  if (idx === -1) return res.status(404).json({ success: false, message: 'Doctor not found' });
+
+  if (action === 'approve') {
+    db.doctors[idx].isVerified = true;
+    db.doctors[idx].verificationStatus = 'approved';
+    db.doctors[idx].isOnline = true;
+    delete db.doctors[idx].rejectionNotes;
+
+    // Update associated user status
+    const uIdx = db.users.findIndex(u => u.doctorId === id);
+    if (uIdx !== -1) db.users[uIdx].status = 'active';
+
+    return res.json({
+      success: true,
+      message: `Doctor ${db.doctors[idx].name} verified and approved successfully!`,
+      data: db.doctors[idx],
+    });
+  } else if (action === 'reject') {
+    db.doctors[idx].isVerified = false;
+    db.doctors[idx].verificationStatus = 'rejected';
+    db.doctors[idx].rejectionNotes = rejectionNotes || 'License documentation verification failed.';
+
+    return res.json({
+      success: true,
+      message: `Doctor application rejected with feedback notes.`,
+      data: db.doctors[idx],
+    });
+  }
+
+  res.status(400).json({ success: false, message: 'Invalid verification action. Use approve or reject.' });
+};
+
 // --- ANALYTICS ---
 exports.getAnalytics = (req, res) => {
   const totalUsers = db.users.length;
@@ -8,7 +123,8 @@ exports.getAnalytics = (req, res) => {
   const totalAppointments = db.appointments.length;
   const completedAppointments = db.appointments.filter(a => a.status === 'completed').length;
   const totalRevenue = db.appointments.reduce((sum, a) => sum + (a.totalAmount || 0), 0);
-  const activeDoctors = db.doctors.filter(d => d.isOnline).length;
+  const activeDoctors = db.doctors.filter(d => d.isOnline && d.isVerified).length;
+  const pendingApprovals = db.doctors.filter(d => d.verificationStatus === 'pending').length;
 
   res.json({
     success: true,
@@ -20,6 +136,7 @@ exports.getAnalytics = (req, res) => {
       completedAppointments,
       totalRevenue: Math.round(totalRevenue),
       activeDoctors,
+      pendingApprovals,
       revenueMonthly: [
         { month: 'May', revenue: 45000, appointments: 68 },
         { month: 'Jun', revenue: 58000, appointments: 84 },
@@ -73,7 +190,12 @@ exports.deleteUser = (req, res) => {
 
 // --- DOCTORS ---
 exports.getDoctors = (req, res) => {
-  res.json({ success: true, count: db.doctors.length, data: db.doctors });
+  // By default, return verified doctors for public listing unless admin query param is passed
+  if (req.query.all === 'true') {
+    return res.json({ success: true, count: db.doctors.length, data: db.doctors });
+  }
+  const verifiedOnly = db.doctors.filter(d => d.isVerified);
+  res.json({ success: true, count: verifiedOnly.length, data: verifiedOnly });
 };
 
 exports.createDoctor = (req, res) => {
@@ -92,6 +214,7 @@ exports.createDoctor = (req, res) => {
     allowsPhysical: req.body.allowsPhysical ?? true,
     allowsVideo: req.body.allowsVideo ?? true,
     isVerified: req.body.isVerified ?? true,
+    verificationStatus: req.body.isVerified ? 'approved' : 'pending',
     clinicName: req.body.clinicName || 'MediCare Clinic',
     clinicAddress: req.body.clinicAddress || 'Jaipur',
     distanceKm: req.body.distanceKm || 1.5,
@@ -250,7 +373,7 @@ exports.sendChatMessage = (req, res) => {
   res.json({ success: true, message: 'Message sent', data: newMsg });
 };
 
-// --- DYNAMIC SETTINGS & CONFIG ---
+// --- DYNAMIC SETTINGS & COUPONS ---
 exports.getSettings = (req, res) => {
   res.json({ success: true, data: db.settings, coupons: db.coupons });
 };
