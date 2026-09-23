@@ -57,9 +57,12 @@ export default function Navbar({ onToggleMobileMenu }) {
         {/* User Info Badge */}
         <div className="flex items-center gap-2 pl-1 sm:pl-2">
           <img
-            src={user?.avatarUrl}
-            alt={user?.name}
+            src={user?.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400'}
+            alt={user?.name || 'User'}
             className="w-8 h-8 rounded-full object-cover ring-2 ring-slate-200"
+            onError={(e) => {
+              e.currentTarget.src = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400';
+            }}
           />
           <div className="hidden lg:block text-left">
             <p className="text-xs font-bold text-slate-800 leading-none">{user?.name}</p>

@@ -102,9 +102,12 @@ export default function Sidebar({ isMobileOpen, onCloseMobile }) {
       <div className="p-4 border-t border-slate-800">
         <div className="flex items-center gap-3 p-2 bg-slate-950/60 rounded-xl border border-slate-800 mb-3">
           <img
-            src={user?.avatarUrl}
-            alt={user?.name}
+            src={user?.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400'}
+            alt={user?.name || 'User'}
             className="w-9 h-9 rounded-lg object-cover border border-slate-700"
+            onError={(e) => {
+              e.currentTarget.src = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400';
+            }}
           />
           <div className="overflow-hidden">
             <p className="text-xs font-bold text-white truncate">{user?.name}</p>
