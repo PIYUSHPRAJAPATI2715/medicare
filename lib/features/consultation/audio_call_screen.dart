@@ -156,12 +156,16 @@ class _AudioCallScreenState extends ConsumerState<AudioCallScreen>
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    'Agora Voice • Room: ${_agora.channelName}',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                  Flexible(
+                    child: Text(
+                      'Agora Voice • Room: ${_agora.channelName}',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: 8),

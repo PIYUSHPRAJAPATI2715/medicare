@@ -180,12 +180,16 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      Text(
-                        'Agora RTC • Room: ${_agora.channelName}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                      Flexible(
+                        child: Text(
+                          'Agora RTC • Room: ${_agora.channelName}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 8),

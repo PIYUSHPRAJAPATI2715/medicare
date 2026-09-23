@@ -263,7 +263,14 @@ class AdminDashboardScreen extends ConsumerWidget {
       ),
       title: Row(
         children: [
-          Text(title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+          Flexible(
+            child: Text(
+              title,
+              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           if (badge != null) ...[
             const SizedBox(width: 8),
             Container(

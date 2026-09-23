@@ -239,6 +239,8 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
                         fontSize: 11,
                         color: AppColors.success,
                         fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -286,16 +288,10 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
           ),
           // Issue Rx button
           Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: TextButton.icon(
-              style: TextButton.styleFrom(
-                backgroundColor: const Color(0xFFDEF7EC),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              onPressed: () {
+            padding: const EdgeInsets.only(right: 8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () {
                 final newRx = ref
                     .read(prescriptionProvider.notifier)
                     .generatePrescriptionForConsultation(doctor: doc);
@@ -308,14 +304,27 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
                   ),
                 );
               },
-              icon: const Icon(Icons.medication_rounded,
-                  size: 15, color: Color(0xFF0E9F6E)),
-              label: const Text(
-                'Rx',
-                style: TextStyle(
-                  color: Color(0xFF0E9F6E),
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDEF7EC),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.medication_rounded,
+                        size: 14, color: Color(0xFF0E9F6E)),
+                    SizedBox(width: 3),
+                    Text(
+                      'Rx',
+                      style: TextStyle(
+                        color: Color(0xFF0E9F6E),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

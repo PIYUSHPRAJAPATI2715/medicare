@@ -194,7 +194,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           ),
           title: Row(
             children: [
-              Text(title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+              Flexible(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
               if (isRecommended) ...[
                 const SizedBox(width: 6),
                 Container(
