@@ -28,6 +28,7 @@ import 'features/admin/admin_dashboard_screen.dart';
 import 'features/prescription/prescription_detail_screen.dart';
 import 'features/prescription/pharmacy_checkout_screen.dart';
 import 'models/prescription_model.dart';
+import 'providers/prescription_provider.dart';
 
 
 void main() {

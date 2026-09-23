@@ -297,7 +297,9 @@ class _PharmacyCheckoutScreenState
                           _isPlacingOrder = false;
                         });
 
-                        _showOrderSuccessSheet(context, rx);
+                        if (mounted) {
+                          _showOrderSuccessSheet(rx);
+                        }
                       },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
@@ -420,7 +422,7 @@ class _PharmacyCheckoutScreenState
     );
   }
 
-  void _showOrderSuccessSheet(BuildContext context, PrescriptionModel rx) {
+  void _showOrderSuccessSheet(PrescriptionModel rx) {
     showModalBottomSheet(
       context: context,
       isDismissible: false,

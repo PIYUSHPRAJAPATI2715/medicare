@@ -180,10 +180,8 @@ class PrescriptionNotifier extends Notifier<PrescriptionState> {
       doctorId: doctor.id,
       doctorName: doctor.name,
       doctorSpecialty: doctor.specialty,
-      doctorRegistration: doctor.experienceYears != null
-          ? 'RMC-${40000 + doctor.experienceYears! * 412}'
-          : 'MCI-91823',
-      doctorAvatar: doctor.avatarUrl,
+      doctorRegistration: 'RMC-${40000 + doctor.experienceYears * 412}',
+      doctorAvatar: doctor.imageUrl,
       patientId: patient.id,
       patientName: patient.name,
       patientAgeGender: '${patient.gender ?? "Male"} • 30 Yrs',

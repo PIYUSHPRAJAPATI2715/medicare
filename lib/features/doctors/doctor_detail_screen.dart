@@ -50,7 +50,7 @@ class _DoctorDetailScreenState extends ConsumerState<DoctorDetailScreen> {
     final doctor = ref.read(doctorByIdProvider(widget.doctorId)) ?? MockData.doctors[0];
     final selectedDate = _availableDates[_selectedDateIndex];
 
-    if (_selectedType == ConsultationType.online || _selectedType == ConsultationType.video) {
+    if (_selectedType == ConsultationType.video) {
       SubscriptionPaywallDialog.checkAndProceed(
         context,
         ref,
