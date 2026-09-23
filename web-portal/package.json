@@ -7,6 +7,7 @@
     "dev": "vite",
     "prebuild": "npm install",
     "build": "npx --yes vite build",
+    "start": "node server.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },
