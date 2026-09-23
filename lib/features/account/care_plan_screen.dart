@@ -37,7 +37,7 @@ class CarePlanScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primaryDark.withOpacity(0.3),
+                      color: AppColors.primaryDark.withValues(alpha: 0.3),
                       blurRadius: 16,
                       offset: const Offset(0, 6),
                     ),
@@ -90,7 +90,7 @@ class CarePlanScreen extends ConsumerWidget {
                           Text(
                             'Renews on ${DateFormat('dd MMM yyyy').format(subState.expiresAt!)}',
                             style: TextStyle(
-                                color: Colors.white.withOpacity(0.8),
+                                color: Colors.white.withValues(alpha: 0.8),
                                 fontSize: 12),
                           ),
                       ],
@@ -112,7 +112,7 @@ class CarePlanScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 16,
                       offset: const Offset(0, 6),
                     ),

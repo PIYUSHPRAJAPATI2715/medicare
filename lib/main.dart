@@ -28,6 +28,7 @@ import 'features/admin/admin_dashboard_screen.dart';
 import 'features/prescription/prescription_detail_screen.dart';
 import 'features/prescription/pharmacy_checkout_screen.dart';
 import 'models/prescription_model.dart';
+import 'models/doctor_model.dart';
 import 'providers/prescription_provider.dart';
 
 
@@ -77,11 +78,17 @@ class MediCareApp extends StatelessWidget {
           case AppRoutes.appointmentConfirmation:
             return MaterialPageRoute(builder: (_) => const BookingConfirmationScreen());
           case AppRoutes.videoCall:
-            return MaterialPageRoute(builder: (_) => const VideoCallScreen());
+            final doctor = settings.arguments as DoctorModel?;
+            return MaterialPageRoute(
+                builder: (_) => VideoCallScreen(doctor: doctor));
           case AppRoutes.audioCall:
-            return MaterialPageRoute(builder: (_) => const AudioCallScreen());
+            final doctor = settings.arguments as DoctorModel?;
+            return MaterialPageRoute(
+                builder: (_) => AudioCallScreen(doctor: doctor));
           case AppRoutes.chat:
-            return MaterialPageRoute(builder: (_) => const DoctorChatScreen());
+            final doctor = settings.arguments as DoctorModel?;
+            return MaterialPageRoute(
+                builder: (_) => DoctorChatScreen(doctor: doctor));
           case AppRoutes.prescriptionDetail:
             final rx = settings.arguments as PrescriptionModel?;
             if (rx != null) {

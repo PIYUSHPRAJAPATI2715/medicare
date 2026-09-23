@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_constants.dart';
@@ -21,34 +21,27 @@ class VideoCallScreen extends ConsumerStatefulWidget {
 
 class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
   final AgoraService _agora = AgoraService();
-  bool _isMuted = false;
-  bool _isVideoOff = false;
-  bool _isFrontCamera = true;
-  int _seconds = 32;
-  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
+    _agora.addListener(_onAgoraUpdate);
     final doc = widget.doctor ?? MockData.doctors[0];
-    _agora.joinConsultation(
-      doctorId: doc.id,
-      patientId: MockData.currentPatient.id,
-      callType: AgoraCallType.video,
-      customChannel: AppConstants.agoraDefaultChannel,
+    _agora.joinVideoCall(
+      channel: '${AppConstants.agoraDefaultChannel}-${doc.id}',
     );
+  }
 
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
-        setState(() => _seconds++);
-      }
-    });
+  void _onAgoraUpdate() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
-    _agora.endCall();
+    _agora.removeListener(_onAgoraUpdate);
+    _agora.leaveChannel();
     super.dispose();
   }
 
@@ -59,17 +52,14 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
   }
 
   void _handleEndCall(DoctorModel doc) async {
-    _timer?.cancel();
-    await _agora.endCall();
+    await _agora.leaveChannel();
 
     if (!mounted) return;
 
-    // Doctor generates digital prescription automatically on consultation end
     final newRx = ref
         .read(prescriptionProvider.notifier)
         .generatePrescriptionForConsultation(doctor: doc);
 
-    // Show quick alert and navigate directly to prescription screen
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -104,7 +94,7 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
               height: 44,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(ctx); // Close dialog
+                  Navigator.pop(ctx);
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
@@ -136,31 +126,12 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 1. Doctor Video Stream (Simulated Agora HD Video Feed)
+          // 1. Remote Doctor Stream or Dynamic Waiting Screen
           Positioned.fill(
-            child: Image.network(
-              doc.imageUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                color: const Color(0xFF1E293B),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.videocam_off_rounded,
-                          color: Colors.white54, size: 64),
-                      const SizedBox(height: 12),
-                      Text(doc.name,
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 18)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            child: _buildRemoteVideoOrWaiting(doc),
           ),
 
-          // Dark subtle gradient overlay at top and bottom
+          // Subtle gradient overlays for top and bottom readability
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
@@ -168,10 +139,10 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withOpacity(0.65),
+                    Colors.black.withValues(alpha: 0.65),
                     Colors.transparent,
                     Colors.transparent,
-                    Colors.black.withOpacity(0.85),
+                    Colors.black.withValues(alpha: 0.85),
                   ],
                 ),
               ),
@@ -191,9 +162,9 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
+                    color: Colors.black.withValues(alpha: 0.55),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -201,14 +172,16 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                       Container(
                         width: 8,
                         height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF10B981),
+                        decoration: BoxDecoration(
+                          color: _agora.isLocalJoined
+                              ? const Color(0xFF10B981)
+                              : Colors.amber,
                           shape: BoxShape.circle,
                         ),
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        'Agora RTC • Room: ${AppConstants.agoraDefaultChannel}',
+                        'Agora RTC • Room: ${_agora.channelName}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
@@ -220,7 +193,7 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 5, vertical: 1),
                         decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.3),
+                          color: Colors.blue.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -265,7 +238,7 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              _formatDuration(_seconds),
+                              _formatDuration(_agora.callDurationSeconds),
                               style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 13,
@@ -280,19 +253,21 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Icon(Icons.hd_rounded,
+                          const Icon(Icons.hd_rounded,
                               color: Colors.white, size: 16),
-                          SizedBox(width: 4),
-                          Text('Agora 1080p',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600)),
+                          const SizedBox(width: 4),
+                          Text(
+                            _agora.remoteUid != null ? 'Doctor Live' : 'Waiting Doctor',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600),
+                          ),
                         ],
                       ),
                     ),
@@ -302,21 +277,21 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
             ),
           ),
 
-          // 3. PIP Floating Patient Video (Bottom Right)
+          // 3. PIP Floating Local Patient Camera View (Real Camera Stream)
           Positioned(
             bottom: 120,
             right: 20,
             child: Container(
-              width: 100,
-              height: 140,
+              width: 110,
+              height: 155,
               decoration: BoxDecoration(
-                color: const Color(0xFF334155),
+                color: const Color(0xFF1E293B),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.white, width: 2),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.4),
-                    blurRadius: 10,
+                    color: Colors.black.withValues(alpha: 0.5),
+                    blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -325,23 +300,19 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                 borderRadius: BorderRadius.circular(14),
                 child: Stack(
                   children: [
-                    Image.network(
-                      MockData.currentPatient.avatarUrl,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Center(
-                        child:
-                            Icon(Icons.person, color: Colors.white, size: 36),
-                      ),
-                    ),
-                    if (_isVideoOff)
+                    if (_agora.engine != null && !_agora.isVideoOff)
+                      AgoraVideoView(
+                        controller: VideoViewController(
+                          rtcEngine: _agora.engine!,
+                          canvas: const VideoCanvas(uid: 0),
+                        ),
+                      )
+                    else
                       Container(
                         color: Colors.black87,
                         child: const Center(
                           child: Icon(Icons.videocam_off_rounded,
-                              color: Colors.white54, size: 28),
+                              color: Colors.white54, size: 32),
                         ),
                       ),
                     Positioned(
@@ -349,12 +320,12 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                       left: 6,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 1),
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.black54,
+                          color: Colors.black.withValues(alpha: 0.65),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Text('You (Agora)',
+                        child: const Text('You (Live)',
                             style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 9.5,
@@ -375,11 +346,11 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B).withOpacity(0.9),
+                color: const Color(0xFF1E293B).withValues(alpha: 0.92),
                 borderRadius: BorderRadius.circular(32),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withValues(alpha: 0.3),
                     blurRadius: 16,
                     offset: const Offset(0, 6),
                   ),
@@ -388,31 +359,25 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // Mute toggle
+                  // Mute Audio toggle
                   _callControlButton(
-                    icon: _isMuted
+                    icon: _agora.isMuted
                         ? Icons.mic_off_rounded
                         : Icons.mic_rounded,
                     label: 'Mute',
-                    isActive: _isMuted,
-                    onTap: () {
-                      _agora.toggleMute();
-                      setState(() => _isMuted = !_isMuted);
-                    },
+                    isActive: _agora.isMuted,
+                    onTap: () => _agora.toggleMute(),
                   ),
-                  // Video toggle
+                  // Video toggle (camera disable/enable)
                   _callControlButton(
-                    icon: _isVideoOff
+                    icon: _agora.isVideoOff
                         ? Icons.videocam_off_rounded
                         : Icons.videocam_rounded,
                     label: 'Video',
-                    isActive: _isVideoOff,
-                    onTap: () {
-                      _agora.toggleVideo();
-                      setState(() => _isVideoOff = !_isVideoOff);
-                    },
+                    isActive: _agora.isVideoOff,
+                    onTap: () => _agora.toggleVideo(),
                   ),
-                  // End Call (Red button -> Triggers Doctor Prescription Flow)
+                  // End Call (Red button -> triggers Doctor Prescription Flow)
                   GestureDetector(
                     onTap: () => _handleEndCall(doc),
                     child: Container(
@@ -423,7 +388,7 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.error.withOpacity(0.4),
+                            color: AppColors.error.withValues(alpha: 0.4),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -441,26 +406,124 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                       Navigator.of(context).pushNamed(AppRoutes.chat);
                     },
                   ),
-                  // Flip camera
+                  // Flip front/rear camera
                   _callControlButton(
                     icon: Icons.flip_camera_ios_rounded,
                     label: 'Flip',
-                    onTap: () {
-                      _agora.switchCamera();
-                      setState(() => _isFrontCamera = !_isFrontCamera);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content: Text(_isFrontCamera
-                                ? 'Agora: Front Camera active'
-                                : 'Agora: Rear Camera active')),
-                      );
-                    },
+                    onTap: () => _agora.switchCamera(),
                   ),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRemoteVideoOrWaiting(DoctorModel doc) {
+    if (_agora.remoteUid != null && _agora.engine != null) {
+      // Remote Doctor Real Stream Connected!
+      return AgoraVideoView(
+        controller: VideoViewController.remote(
+          rtcEngine: _agora.engine!,
+          canvas: VideoCanvas(uid: _agora.remoteUid),
+          connection: RtcConnection(channelId: _agora.channelName),
+        ),
+      );
+    }
+
+    // Dynamic Live Waiting Screen while waiting for doctor
+    return Container(
+      color: const Color(0xFF0F172A),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.primary, width: 2),
+                  ),
+                ),
+                const SizedBox(
+                  width: 140,
+                  height: 140,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
+                  ),
+                ),
+                CircleAvatar(
+                  radius: 50,
+                  backgroundImage: NetworkImage(doc.imageUrl),
+                  backgroundColor: AppColors.primaryLight,
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              doc.name,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              doc.specialty,
+              style: const TextStyle(
+                color: Color(0xFF93C5FD),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        _agora.isLocalJoined
+                            ? 'Channel joined • Waiting for doctor to connect'
+                            : 'Connecting to Agora RTC room...',
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Channel ID: ${_agora.channelName}',
+                    style: const TextStyle(color: Colors.white54, fontSize: 10.5),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -482,7 +545,7 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
             decoration: BoxDecoration(
               color: isActive
                   ? Colors.white
-                  : Colors.white.withOpacity(0.15),
+                  : Colors.white.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Icon(

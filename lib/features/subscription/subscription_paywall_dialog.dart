@@ -215,14 +215,14 @@ class _SubscriptionPaywallDialogState
                           boxShadow: isSelected
                               ? [
                                   BoxShadow(
-                                    color: AppColors.primary.withOpacity(0.12),
+                                    color: AppColors.primary.withValues(alpha: 0.12),
                                     blurRadius: 10,
                                     offset: const Offset(0, 4),
                                   )
                                 ]
                               : [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.02),
+                                    color: Colors.black.withValues(alpha: 0.02),
                                     blurRadius: 4,
                                     offset: const Offset(0, 2),
                                   )

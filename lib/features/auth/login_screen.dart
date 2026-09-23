@@ -43,16 +43,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     Navigator.of(context).pushReplacementNamed(AppRoutes.mainShell);
   }
 
-  void _quickLoginAsDoctor() {
-    ref.read(authProvider.notifier).loginAsDoctor();
-    Navigator.of(context).pushReplacementNamed(AppRoutes.doctorDashboard);
-  }
-
-  void _quickAdminPreview() {
-    ref.read(authProvider.notifier).switchRole(UserRole.admin);
-    Navigator.of(context).pushNamed(AppRoutes.adminDashboard);
-  }
-
   @override
   void dispose() {
     _phoneOrEmailController.dispose();

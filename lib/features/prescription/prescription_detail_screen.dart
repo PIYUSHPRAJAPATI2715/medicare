@@ -131,7 +131,7 @@ class PrescriptionDetailScreen extends ConsumerWidget {
                 border: Border.all(color: Colors.grey.shade200),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 10,
                     offset: const Offset(0, 3),
                   )
@@ -183,7 +183,7 @@ class PrescriptionDetailScreen extends ConsumerWidget {
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(6),
                                       border: Border.all(
-                                          color: AppColors.primary.withOpacity(0.3)),
+                                          color: AppColors.primary.withValues(alpha: 0.3)),
                                     ),
                                     child: Text(
                                       currentRx.id,
@@ -555,7 +555,7 @@ class PrescriptionDetailScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF1D4ED8).withOpacity(0.3),
+                      color: const Color(0xFF1D4ED8).withValues(alpha: 0.3),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -566,7 +566,7 @@ class PrescriptionDetailScreen extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
+                        color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(

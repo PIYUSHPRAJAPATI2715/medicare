@@ -1,37 +1,20 @@
 import 'dart:async';
+import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/foundation.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../core/constants/app_constants.dart';
 
 enum AgoraCallType { video, audio }
 
-enum AgoraConnectionState {
-  disconnected,
-  connecting,
-  connected,
+enum AgoraEngineStatus {
+  idle,
+  requestingPermissions,
+  initializing,
+  joining,
+  joined,
   reconnecting,
-  ended,
-}
-
-class AgoraChannelSession {
-  final String appId;
-  final String appCertificate;
-  final String channelName;
-  final int localUid;
-  final int remoteDoctorUid;
-  final String token;
-  final AgoraCallType callType;
-  final DateTime joinedAt;
-
-  AgoraChannelSession({
-    required this.appId,
-    required this.appCertificate,
-    required this.channelName,
-    required this.localUid,
-    required this.remoteDoctorUid,
-    required this.token,
-    required this.callType,
-    required this.joinedAt,
-  });
+  error,
+  left,
 }
 
 class AgoraService extends ChangeNotifier {
@@ -39,133 +22,309 @@ class AgoraService extends ChangeNotifier {
   factory AgoraService() => _instance;
   AgoraService._internal();
 
-  AgoraConnectionState _connectionState = AgoraConnectionState.disconnected;
-  AgoraChannelSession? _activeSession;
-
+  RtcEngine? _engine;
+  AgoraEngineStatus _status = AgoraEngineStatus.idle;
+  String _channelName = AppConstants.agoraDefaultChannel;
+  int? _remoteUid;
+  bool _isLocalJoined = false;
   bool _isMuted = false;
-  bool _isVideoDisabled = false;
-  bool _isSpeakerOn = true;
+  bool _isVideoOff = false;
+  bool _isSpeaker = true;
   bool _isFrontCamera = true;
-  int _latencyMs = 24;
+  int _latencyMs = 28;
+  String? _errorMessage;
   int _callDurationSeconds = 0;
   Timer? _durationTimer;
-  Timer? _latencyTimer;
 
   // Getters
-  AgoraConnectionState get connectionState => _connectionState;
-  AgoraChannelSession? get activeSession => _activeSession;
+  RtcEngine? get engine => _engine;
+  AgoraEngineStatus get status => _status;
+  String get channelName => _channelName;
+  int? get remoteUid => _remoteUid;
+  bool get isLocalJoined => _isLocalJoined;
   bool get isMuted => _isMuted;
-  bool get isVideoDisabled => _isVideoDisabled;
-  bool get isSpeakerOn => _isSpeakerOn;
+  bool get isVideoOff => _isVideoOff;
+  bool get isSpeaker => _isSpeaker;
   bool get isFrontCamera => _isFrontCamera;
   int get latencyMs => _latencyMs;
+  String? get errorMessage => _errorMessage;
   int get callDurationSeconds => _callDurationSeconds;
-  String get appId => AppConstants.agoraAppId;
-  String get channelId => _activeSession?.channelName ?? AppConstants.agoraDefaultChannel;
 
-  /// Generate deterministic token for Agora Channel
-  String generateToken({
-    required String channelName,
-    required int uid,
-    int expirationSeconds = 3600,
-  }) {
-    final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    // Format standardized Agora token signature preview
-    return '006${AppConstants.agoraAppId}IAC${uid}T${timestamp + expirationSeconds}X${AppConstants.agoraAppCertificate.substring(0, 8)}';
-  }
-
-  /// Initialize and join consultation room
-  Future<bool> joinConsultation({
-    required String doctorId,
-    required String patientId,
-    required AgoraCallType callType,
-    String? customChannel,
-  }) async {
-    _connectionState = AgoraConnectionState.connecting;
+  /// Request runtime permissions for Camera and Microphone
+  Future<bool> requestPermissions(AgoraCallType callType) async {
+    _status = AgoraEngineStatus.requestingPermissions;
     notifyListeners();
 
-    final channelName = customChannel ?? '${AppConstants.agoraDefaultChannel}-$doctorId';
-    final localUid = 1000 + (DateTime.now().millisecondsSinceEpoch % 9000);
-    final remoteDoctorUid = 2000 + (doctorId.hashCode.abs() % 9000);
+    if (callType == AgoraCallType.video) {
+      final statuses = await [
+        Permission.camera,
+        Permission.microphone,
+      ].request();
 
-    final token = generateToken(channelName: channelName, uid: localUid);
+      final cameraGranted = statuses[Permission.camera]?.isGranted ?? false;
+      final micGranted = statuses[Permission.microphone]?.isGranted ?? false;
 
-    // Simulate Agora handshake latency
-    await Future.delayed(const Duration(milliseconds: 600));
+      if (!cameraGranted || !micGranted) {
+        _status = AgoraEngineStatus.error;
+        _errorMessage = 'Camera and Microphone permissions are required for Video Calls.';
+        notifyListeners();
+        return false;
+      }
+    } else {
+      final micStatus = await Permission.microphone.request();
+      if (!micStatus.isGranted) {
+        _status = AgoraEngineStatus.error;
+        _errorMessage = 'Microphone permission is required for Audio Calls.';
+        notifyListeners();
+        return false;
+      }
+    }
 
-    _activeSession = AgoraChannelSession(
-      appId: AppConstants.agoraAppId,
-      appCertificate: AppConstants.agoraAppCertificate,
-      channelName: channelName,
-      localUid: localUid,
-      remoteDoctorUid: remoteDoctorUid,
-      token: token,
-      callType: callType,
-      joinedAt: DateTime.now(),
-    );
+    return true;
+  }
 
-    _connectionState = AgoraConnectionState.connected;
-    _callDurationSeconds = 0;
-    _isMuted = false;
-    _isVideoDisabled = false;
-    _isSpeakerOn = true;
-    _isFrontCamera = true;
+  /// Initialize real Agora RTC Engine
+  Future<bool> initializeEngine() async {
+    if (_engine != null) return true;
 
-    // Start timer for duration
+    try {
+      _status = AgoraEngineStatus.initializing;
+      notifyListeners();
+
+      _engine = createAgoraRtcEngine();
+      await _engine!.initialize(
+        const RtcEngineContext(
+          appId: AppConstants.agoraAppId,
+          channelProfile: ChannelProfileType.channelProfileCommunication,
+        ),
+      );
+
+      _engine!.registerEventHandler(
+        RtcEngineEventHandler(
+          onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
+            _isLocalJoined = true;
+            _status = AgoraEngineStatus.joined;
+            _errorMessage = null;
+            notifyListeners();
+          },
+          onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
+            _remoteUid = remoteUid;
+            notifyListeners();
+          },
+          onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
+            if (_remoteUid == remoteUid) {
+              _remoteUid = null;
+            }
+            notifyListeners();
+          },
+          onRtcStats: (RtcConnection connection, RtcStats stats) {
+            if (stats.lastmileDelay != null && stats.lastmileDelay! > 0) {
+              _latencyMs = stats.lastmileDelay!;
+              notifyListeners();
+            }
+          },
+          onError: (ErrorCodeType err, String msg) {
+            _errorMessage = 'Agora RTC Error ($err): $msg';
+            notifyListeners();
+          },
+          onLeaveChannel: (RtcConnection connection, RtcStats stats) {
+            _isLocalJoined = false;
+            _remoteUid = null;
+            _status = AgoraEngineStatus.left;
+            notifyListeners();
+          },
+        ),
+      );
+
+      return true;
+    } catch (e) {
+      _status = AgoraEngineStatus.error;
+      _errorMessage = 'Failed to initialize Agora RTC Engine: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Join real Agora Video Call Room
+  Future<bool> joinVideoCall({
+    String? channel,
+    int uid = 0,
+    String? token,
+  }) async {
+    final hasPermissions = await requestPermissions(AgoraCallType.video);
+    if (!hasPermissions) return false;
+
+    final initSuccess = await initializeEngine();
+    if (!initSuccess || _engine == null) return false;
+
+    try {
+      _channelName = channel ?? AppConstants.agoraDefaultChannel;
+      _status = AgoraEngineStatus.joining;
+      _remoteUid = null;
+      _isLocalJoined = false;
+      _isMuted = false;
+      _isVideoOff = false;
+      _isSpeaker = true;
+      _isFrontCamera = true;
+      _callDurationSeconds = 0;
+      notifyListeners();
+
+      // Enable Real Video and start local camera preview
+      await _engine!.enableVideo();
+      await _engine!.startPreview();
+      await _engine!.setEnableSpeakerphone(true);
+
+      // Join Channel using provided App ID & Channel
+      await _engine!.joinChannel(
+        token: token ?? '',
+        channelId: _channelName,
+        uid: uid,
+        options: const ChannelMediaOptions(
+          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+          channelProfile: ChannelProfileType.channelProfileCommunication,
+          publishCameraTrack: true,
+          publishMicrophoneTrack: true,
+          autoSubscribeAudio: true,
+          autoSubscribeVideo: true,
+        ),
+      );
+
+      _startTimer();
+      return true;
+    } catch (e) {
+      _status = AgoraEngineStatus.error;
+      _errorMessage = 'Failed to join video channel: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Join real Agora Audio Call Room
+  Future<bool> joinAudioCall({
+    String? channel,
+    int uid = 0,
+    String? token,
+  }) async {
+    final hasPermissions = await requestPermissions(AgoraCallType.audio);
+    if (!hasPermissions) return false;
+
+    final initSuccess = await initializeEngine();
+    if (!initSuccess || _engine == null) return false;
+
+    try {
+      _channelName = channel ?? AppConstants.agoraDefaultChannel;
+      _status = AgoraEngineStatus.joining;
+      _remoteUid = null;
+      _isLocalJoined = false;
+      _isMuted = false;
+      _isVideoOff = true;
+      _isSpeaker = true;
+      _callDurationSeconds = 0;
+      notifyListeners();
+
+      await _engine!.enableAudio();
+      await _engine!.disableVideo();
+      await _engine!.setEnableSpeakerphone(true);
+
+      await _engine!.joinChannel(
+        token: token ?? '',
+        channelId: _channelName,
+        uid: uid,
+        options: const ChannelMediaOptions(
+          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+          channelProfile: ChannelProfileType.channelProfileCommunication,
+          publishCameraTrack: false,
+          publishMicrophoneTrack: true,
+          autoSubscribeAudio: true,
+          autoSubscribeVideo: false,
+        ),
+      );
+
+      _startTimer();
+      return true;
+    } catch (e) {
+      _status = AgoraEngineStatus.error;
+      _errorMessage = 'Failed to join audio channel: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  void _startTimer() {
     _durationTimer?.cancel();
+    _callDurationSeconds = 0;
     _durationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       _callDurationSeconds++;
       notifyListeners();
     });
-
-    // Network jitter simulation
-    _latencyTimer?.cancel();
-    _latencyTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
-      _latencyMs = 20 + (DateTime.now().second % 15);
-      notifyListeners();
-    });
-
-    notifyListeners();
-    return true;
   }
 
-  /// Toggle Audio Mute
-  void toggleMute() {
+  /// Toggle Audio Mute on Agora RTC
+  Future<void> toggleMute() async {
+    if (_engine == null) return;
     _isMuted = !_isMuted;
+    await _engine!.muteLocalAudioStream(_isMuted);
     notifyListeners();
   }
 
-  /// Toggle Local Video Camera
-  void toggleVideo() {
-    _isVideoDisabled = !_isVideoDisabled;
+  /// Toggle Video Camera on Agora RTC
+  Future<void> toggleVideo() async {
+    if (_engine == null) return;
+    _isVideoOff = !_isVideoOff;
+    await _engine!.muteLocalVideoStream(_isVideoOff);
+    if (_isVideoOff) {
+      await _engine!.stopPreview();
+    } else {
+      await _engine!.startPreview();
+    }
     notifyListeners();
   }
 
-  /// Switch between Front and Rear Camera
-  void switchCamera() {
+  /// Switch between Front and Rear Camera on Agora RTC
+  Future<void> switchCamera() async {
+    if (_engine == null) return;
+    await _engine!.switchCamera();
     _isFrontCamera = !_isFrontCamera;
     notifyListeners();
   }
 
-  /// Toggle Speakerphone
-  void toggleSpeaker() {
-    _isSpeakerOn = !_isSpeakerOn;
+  /// Toggle Speakerphone on Agora RTC
+  Future<void> toggleSpeaker() async {
+    if (_engine == null) return;
+    _isSpeaker = !_isSpeaker;
+    await _engine!.setEnableSpeakerphone(_isSpeaker);
     notifyListeners();
   }
 
-  /// End Agora Call Session
-  Future<void> endCall() async {
+  /// Leave Channel and release Agora RTC
+  Future<void> leaveChannel() async {
     _durationTimer?.cancel();
-    _latencyTimer?.cancel();
     _durationTimer = null;
-    _latencyTimer = null;
-    _connectionState = AgoraConnectionState.ended;
-    notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 300));
-    _activeSession = null;
-    _connectionState = AgoraConnectionState.disconnected;
+    if (_engine != null) {
+      try {
+        await _engine!.stopPreview();
+        await _engine!.leaveChannel();
+      } catch (_) {}
+    }
+
+    _isLocalJoined = false;
+    _remoteUid = null;
+    _status = AgoraEngineStatus.left;
     _callDurationSeconds = 0;
+    notifyListeners();
+  }
+
+  /// Dispose entire Agora engine when no longer needed
+  Future<void> destroyEngine() async {
+    await leaveChannel();
+    if (_engine != null) {
+      try {
+        await _engine!.release();
+      } catch (_) {}
+      _engine = null;
+    }
+    _status = AgoraEngineStatus.idle;
     notifyListeners();
   }
 }

@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.medicare.plus.medicare_plus"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 35
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
