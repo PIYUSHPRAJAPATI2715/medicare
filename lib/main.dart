@@ -27,6 +27,10 @@ import 'features/doctor_dashboard/doctor_dashboard_screen.dart';
 import 'features/admin/admin_dashboard_screen.dart';
 import 'features/prescription/prescription_detail_screen.dart';
 import 'features/prescription/pharmacy_checkout_screen.dart';
+import 'features/prescription/prescriptions_list_screen.dart';
+import 'features/wallet/wallet_screen.dart';
+import 'features/consultation/consultation_summary_screen.dart';
+import 'data/mock/mock_data.dart';
 import 'models/prescription_model.dart';
 import 'models/doctor_model.dart';
 import 'providers/prescription_provider.dart';
@@ -131,6 +135,22 @@ class MediCareApp extends StatelessWidget {
             );
           case AppRoutes.appointmentsHistory:
             return MaterialPageRoute(builder: (_) => const AppointmentsHistoryScreen());
+          case AppRoutes.prescriptionsList:
+            return MaterialPageRoute(builder: (_) => const PrescriptionsListScreen());
+          case AppRoutes.wallet:
+            return MaterialPageRoute(builder: (_) => const WalletScreen());
+          case AppRoutes.consultationSummary:
+            final args = settings.arguments as Map<String, dynamic>?;
+            final doctor = args?['doctor'] as DoctorModel? ?? MockData.doctors.first;
+            final duration = args?['duration'] as int? ?? 270;
+            final callType = args?['callType'] as String? ?? 'video';
+            return MaterialPageRoute(
+              builder: (_) => ConsultationSummaryScreen(
+                doctor: doctor,
+                callDurationSeconds: duration,
+                callType: callType,
+              ),
+            );
           case AppRoutes.editProfile:
             return MaterialPageRoute(builder: (_) => const EditProfileScreen());
           case AppRoutes.carePlan:

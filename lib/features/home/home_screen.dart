@@ -7,6 +7,8 @@ import '../../core/animation/animation_utils.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/doctor_provider.dart';
 import '../../providers/specialty_provider.dart';
+import '../../providers/wallet_provider.dart';
+import '../../providers/prescription_provider.dart';
 import '../../data/mock/mock_data.dart';
 import '../../widgets/specialty_card.dart';
 import '../../widgets/rating_badge.dart';
@@ -130,6 +132,9 @@ class HomeScreen extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final specialties = ref.watch(specialtiesListProvider);
     final recentDoctors = MockData.doctors.take(3).toList();
+    final wallet = ref.watch(walletProvider);
+    final prescriptionState = ref.watch(prescriptionProvider);
+    final rxCount = prescriptionState.prescriptions.length;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -355,7 +360,53 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 12),
+
+              // Quick Health Services Strip: Prescriptions, HealthPay Wallet, Care Plans
+              StaggeredFadeSlide(
+                index: 3,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      _buildQuickPill(
+                        context: context,
+                        icon: Icons.receipt_long_rounded,
+                        title: 'Prescriptions',
+                        badge: rxCount > 0 ? '$rxCount Rx' : 'View',
+                        badgeColor: AppColors.primary,
+                        bgColor: AppColors.primaryLight.withValues(alpha: 0.5),
+                        iconColor: AppColors.primary,
+                        onTap: () => Navigator.pushNamed(context, AppRoutes.prescriptionsList),
+                      ),
+                      const SizedBox(width: 10),
+                      _buildQuickPill(
+                        context: context,
+                        icon: Icons.account_balance_wallet_rounded,
+                        title: 'HealthPay',
+                        badge: '₹${wallet.balance.toInt()}',
+                        badgeColor: const Color(0xFF16A34A),
+                        bgColor: const Color(0xFFF0FDF4),
+                        iconColor: const Color(0xFF16A34A),
+                        onTap: () => Navigator.pushNamed(context, AppRoutes.wallet),
+                      ),
+                      const SizedBox(width: 10),
+                      _buildQuickPill(
+                        context: context,
+                        icon: Icons.verified_rounded,
+                        title: 'Care Plans',
+                        badge: 'VIP',
+                        badgeColor: const Color(0xFFEA580C),
+                        bgColor: const Color(0xFFFFF7ED),
+                        iconColor: const Color(0xFFEA580C),
+                        onTap: () => Navigator.pushNamed(context, AppRoutes.carePlan),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
 
               // 4. "Consult a Doctor" Specialty Grid
               StaggeredFadeSlide(
@@ -820,6 +871,83 @@ class HomeScreen extends ConsumerWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickPill({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String badge,
+    required Color badgeColor,
+    required Color bgColor,
+    required Color iconColor,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: AppBouncyTouch(
+        scaleFactor: 0.95,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: iconColor, size: 16),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: badgeColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      badge,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: badgeColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ),
     );

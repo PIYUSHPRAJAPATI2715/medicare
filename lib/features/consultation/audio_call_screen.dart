@@ -4,9 +4,8 @@ import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/mock/mock_data.dart';
 import '../../models/doctor_model.dart';
-import '../../providers/prescription_provider.dart';
 import '../../services/agora_service.dart';
-import '../prescription/prescription_detail_screen.dart';
+import 'consultation_summary_screen.dart';
 
 class AudioCallScreen extends ConsumerStatefulWidget {
   final DoctorModel? doctor;
@@ -58,67 +57,18 @@ class _AudioCallScreenState extends ConsumerState<AudioCallScreen>
   }
 
   void _handleEndCall(DoctorModel doc) async {
+    final duration = _agora.callDurationSeconds;
     await _agora.leaveChannel();
 
     if (!mounted) return;
 
-    final newRx = ref
-        .read(prescriptionProvider.notifier)
-        .generatePrescriptionForConsultation(doctor: doc);
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: const BoxDecoration(
-                color: Color(0xFFDEF7EC),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.description_rounded,
-                  color: Color(0xFF0E9F6E), size: 36),
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'Call Completed',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '${doc.name} has issued your official digital prescription.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (c) => PrescriptionDetailScreen(prescription: newRx),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text('View Prescription & Order Tablets',
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w700)),
-              ),
-            ),
-          ],
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ConsultationSummaryScreen(
+          doctor: doc,
+          callDurationSeconds: duration > 0 ? duration : 180,
+          callType: 'audio',
         ),
       ),
     );

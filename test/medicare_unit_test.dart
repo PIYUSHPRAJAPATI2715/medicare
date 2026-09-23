@@ -6,6 +6,10 @@ import 'package:medicare_plus/providers/auth_provider.dart';
 import 'package:medicare_plus/providers/doctor_provider.dart';
 import 'package:medicare_plus/providers/appointment_provider.dart';
 import 'package:medicare_plus/providers/chat_provider.dart';
+import 'package:medicare_plus/providers/wallet_provider.dart';
+import 'package:medicare_plus/providers/prescription_provider.dart';
+import 'package:medicare_plus/models/wallet_model.dart';
+import 'package:medicare_plus/models/prescription_model.dart';
 import 'package:flutter/material.dart';
 import 'package:medicare_plus/widgets/floating_bottom_nav.dart';
 import 'package:medicare_plus/data/mock/mock_data.dart';
@@ -149,6 +153,125 @@ void main() {
       expect(find.text('In-Person'), findsOneWidget);
       expect(find.text('Video Consult'), findsOneWidget);
       expect(find.text('Account'), findsOneWidget);
+    });
+  });
+
+  group('HealthPay Wallet Tests', () {
+    test('Initial wallet balance and details are configured', () {
+      final container = ProviderContainer();
+      final wallet = container.read(walletProvider);
+      expect(wallet.balance, 1250.0);
+      expect(wallet.healthCashback, 210.0);
+      expect(wallet.transactions.isNotEmpty, true);
+    });
+
+    test('addMoney loads funds and records transaction', () {
+      final container = ProviderContainer();
+      final initialBalance = container.read(walletProvider).balance;
+
+      container.read(walletProvider.notifier).addMoney(500.0, 'UPI');
+      final updated = container.read(walletProvider);
+
+      expect(updated.balance, initialBalance + 500.0);
+      expect(updated.transactions.first.amount, 500.0);
+      expect(updated.transactions.first.isCredit, true);
+    });
+
+    test('payWithWallet deducts balance, awards 5% cashback, and checks insufficient balance', () {
+      final container = ProviderContainer();
+      final initialBalance = container.read(walletProvider).balance;
+
+      // 1. Successful payment
+      final success = container.read(walletProvider.notifier).payWithWallet(
+            200.0,
+            'Dr. Consultation',
+            category: WalletTransactionCategory.consultation,
+          );
+      expect(success, true);
+
+      // Cashback is 5% of 200 = 10. Net balance change = -200 + 10 = -190
+      final currentBalance = container.read(walletProvider).balance;
+      expect(currentBalance, initialBalance - 200.0 + 10.0);
+
+      // 2. Failed payment with excess amount
+      final failed = container.read(walletProvider.notifier).payWithWallet(
+            999999.0,
+            'Excessive charge',
+            category: WalletTransactionCategory.consultation,
+          );
+      expect(failed, false);
+    });
+  });
+
+  group('Prescription Lifecycle & Doctor Rx Writer Tests', () {
+    test('Prescription provider contains default prescriptions', () {
+      final container = ProviderContainer();
+      final rxList = container.read(prescriptionProvider).prescriptions;
+      expect(rxList.isNotEmpty, true);
+    });
+
+    test('Start consultation pending Rx registers drafting status', () {
+      final container = ProviderContainer();
+      final doctor = MockData.doctors.first;
+
+      container.read(prescriptionProvider.notifier).startConsultationPendingRx(doctor);
+
+      final state = container.read(prescriptionProvider);
+      expect(state.pendingDrafts.containsKey(doctor.id), true);
+      expect(state.lastNotificationMessage?.contains('drafting'), true);
+    });
+
+    test('Doctor submits prescription, moving lifecycle to issued with medicines and token', () {
+      final container = ProviderContainer();
+      final doctor = MockData.doctors.first;
+
+      container.read(prescriptionProvider.notifier).startConsultationPendingRx(doctor);
+
+      final issuedRx = container.read(prescriptionProvider.notifier).submitDoctorPrescription(
+            doctor: doctor,
+            diagnosis: 'Acute Bronchitis',
+            clinicalNotes: 'Patient exhibits wheezing and mild cough.',
+            adviceNotes: 'Hydration and rest.',
+            followUpDate: DateTime.now().add(const Duration(days: 7)),
+            medicines: [
+              const PrescribedMedicine(
+                id: 'med_test_1',
+                name: 'Amoxicillin 500mg',
+                genericName: 'Amoxicillin Trihydrate',
+                dosage: '1 capsule',
+                frequency: 'Thrice a day',
+                instructions: 'After meals',
+                durationDays: 5,
+                unitPrice: 12.0,
+                quantity: 15,
+              ),
+            ],
+          );
+
+      expect(issuedRx.status, PrescriptionLifecycleStatus.issued);
+      expect(issuedRx.diagnosis, 'Acute Bronchitis');
+      expect(issuedRx.medicines.length, 1);
+      expect(issuedRx.digitalSignatureToken.isNotEmpty, true);
+
+      // Verify it is in state.prescriptions
+      final state = container.read(prescriptionProvider);
+      expect(state.prescriptions.any((rx) => rx.id == issuedRx.id), true);
+    });
+
+    test('placePharmacyOrder updates fulfillment type and pharmacy order status', () {
+      final container = ProviderContainer();
+      final rxList = container.read(prescriptionProvider).prescriptions;
+      final targetRx = rxList.first;
+
+      container.read(prescriptionProvider.notifier).placePharmacyOrder(
+            targetRx.id,
+            address: 'Flat 402, Sunshine Heights, Mumbai',
+          );
+
+      final updatedRx = container.read(prescriptionProvider).prescriptions.firstWhere((p) => p.id == targetRx.id);
+      expect(updatedRx.fulfillmentType, OrderFulfillmentType.orderedOnline);
+      expect(updatedRx.pharmacyStatus, PharmacyOrderStatus.placed);
+      expect(updatedRx.deliveryAddress, 'Flat 402, Sunshine Heights, Mumbai');
     });
   });
 }

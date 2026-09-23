@@ -44,7 +44,7 @@ class PrescriptionDetailScreen extends ConsumerWidget {
             tooltip: 'Download PDF',
             icon: const Icon(Icons.download_rounded),
             onPressed: () {
-              _showDownloadSuccess(context);
+              _showDownloadModal(context, currentRx);
             },
           ),
         ],
@@ -692,23 +692,288 @@ class PrescriptionDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _showDownloadSuccess(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: const Color(0xFF0E9F6E),
-        content: const Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.white),
-            SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Prescription PDF saved to Downloads & MediCare Files.',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+  void _showDownloadModal(BuildContext context, PrescriptionModel rx) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final fileName = '${rx.id}_${rx.doctorName.replaceAll(' ', '_')}.pdf';
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDEF7EC),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.picture_as_pdf_rounded,
+                            color: Color(0xFF0E9F6E), size: 26),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Download e-Prescription',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              fileName,
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Column(
+                      children: [
+                        _fileDetailRow('Prescription ID', rx.id),
+                        const SizedBox(height: 8),
+                        _fileDetailRow('Prescribing Doctor', rx.doctorName),
+                        const SizedBox(height: 8),
+                        _fileDetailRow('Medical License', rx.doctorRegistration),
+                        const SizedBox(height: 8),
+                        _fileDetailRow('Document Format', 'Encrypted PDF (284 KB)'),
+                        const SizedBox(height: 8),
+                        _fileDetailRow('Storage Path', '/Downloads/MediCare/$fileName'),
+                        const SizedBox(height: 8),
+                        _fileDetailRow('Digital Seal', 'MCI / NMC Certified SHA256 Token'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF86EFAC)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.check_circle_rounded,
+                            color: Color(0xFF16A34A), size: 20),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Document successfully generated and saved to device Downloads.',
+                            style: TextStyle(
+                              color: Color(0xFF166534),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: BorderSide(color: Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _showDocumentViewer(context, rx);
+                          },
+                          icon: const Icon(Icons.remove_red_eye_rounded, size: 18),
+                          label: const Text('View PDF',
+                              style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0E9F6E),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _showShareSuccess(context);
+                          },
+                          icon: const Icon(Icons.share_rounded, size: 18),
+                          label: const Text('Share PDF',
+                              style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _fileDetailRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+        Flexible(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showDocumentViewer(BuildContext context, PrescriptionModel rx) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+        contentPadding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+        title: Row(
+          children: [
+            const Icon(Icons.description_rounded, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Text('PDF Viewer: ${rx.id}',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.close_rounded, size: 20),
+              onPressed: () => Navigator.pop(ctx),
             ),
           ],
         ),
-        duration: const Duration(seconds: 3),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Letterhead
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(rx.hospitalName,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF1E3A8A))),
+                      const SizedBox(height: 2),
+                      Text('${rx.doctorName} • ${rx.doctorSpecialty}',
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF2563EB))),
+                      Text('Reg: ${rx.doctorRegistration} • MCI Verified',
+                          style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text('Diagnosis: ${rx.diagnosis}',
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
+                const SizedBox(height: 8),
+                const Divider(),
+                const Text('Prescribed Medicines:',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                const SizedBox(height: 6),
+                ...rx.medicines.map((m) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Expanded(
+                            child: Text(
+                              '${m.name} (${m.dosage}) - ${m.frequency} for ${m.durationDays} days [${m.instructions}]',
+                              style: const TextStyle(fontSize: 11.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
+                const Divider(),
+                Text('Advice: ${rx.adviceNotes}',
+                    style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700, fontStyle: FontStyle.italic)),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Icon(Icons.qr_code_2_rounded, size: 40, color: Colors.grey),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('Signed: ${rx.doctorName}',
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
+                        Text(rx.digitalSignatureToken,
+                            style: TextStyle(fontSize: 9, color: Colors.grey.shade500)),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -716,7 +981,8 @@ class PrescriptionDetailScreen extends ConsumerWidget {
   void _showShareSuccess(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Prescription link copied to clipboard for sharing.'),
+        backgroundColor: Color(0xFF0E9F6E),
+        content: Text('Prescription PDF shared successfully.'),
         duration: Duration(seconds: 2),
       ),
     );
@@ -796,7 +1062,7 @@ class PrescriptionDetailScreen extends ConsumerWidget {
                 child: ElevatedButton.icon(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    _showDownloadSuccess(context);
+                    _showDownloadModal(context, rx);
                   },
                   icon: const Icon(Icons.download_rounded, color: Colors.white),
                   label: const Text(

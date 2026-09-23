@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/prescription_model.dart';
+import '../../models/wallet_model.dart';
 import '../../providers/prescription_provider.dart';
+import '../../providers/wallet_provider.dart';
 
 class PharmacyCheckoutScreen extends ConsumerStatefulWidget {
   final PrescriptionModel prescription;
@@ -34,6 +36,7 @@ class _PharmacyCheckoutScreenState
   @override
   Widget build(BuildContext context) {
     final rx = widget.prescription;
+    final wallet = ref.watch(walletProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -215,13 +218,18 @@ class _PharmacyCheckoutScreenState
               ),
               child: Column(
                 children: [
-                  _paymentTile(0, 'UPI (Google Pay, PhonePe, Paytm)',
+                  _paymentTile(
+                      0,
+                      'MediCare+ HealthPay Wallet (₹${wallet.balance.toStringAsFixed(0)} available)',
                       Icons.account_balance_wallet_rounded),
                   const Divider(height: 1),
-                  _paymentTile(
-                      1, 'Cash on Delivery (Pay at Doorstep)', Icons.money_rounded),
+                  _paymentTile(1, 'UPI (Google Pay, PhonePe, Paytm)',
+                      Icons.qr_code_rounded),
                   const Divider(height: 1),
-                  _paymentTile(2, 'Credit / Debit Cards & Netbanking',
+                  _paymentTile(
+                      2, 'Cash on Delivery (Pay at Doorstep)', Icons.money_rounded),
+                  const Divider(height: 1),
+                  _paymentTile(3, 'Credit / Debit Cards & Netbanking',
                       Icons.credit_card_rounded),
                 ],
               ),
@@ -278,12 +286,33 @@ class _PharmacyCheckoutScreenState
                 onPressed: _isPlacingOrder
                     ? null
                     : () async {
+                        final messenger = ScaffoldMessenger.of(context);
                         setState(() {
                           _isPlacingOrder = true;
                         });
 
                         await Future.delayed(
                             const Duration(milliseconds: 700));
+
+                        if (!mounted) return;
+
+                        if (_selectedPaymentMethod == 0) {
+                          final paid = ref.read(walletProvider.notifier).payWithWallet(
+                                rx.finalAmount,
+                                'Medicines Order: ${rx.id}',
+                                category: WalletTransactionCategory.pharmacy,
+                                referenceId: rx.id,
+                              );
+                          if (!paid) {
+                            setState(() => _isPlacingOrder = false);
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Insufficient Wallet balance. Please add money or choose another payment method.'),
+                              ),
+                            );
+                            return;
+                          }
+                        }
 
                         ref
                             .read(prescriptionProvider.notifier)

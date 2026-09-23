@@ -33,6 +33,9 @@ class AppRoutes {
 
   // Account Sub-pages
   static const String appointmentsHistory = '/appointments-history';
+  static const String prescriptionsList = '/prescriptions-list';
+  static const String wallet = '/wallet';
+  static const String consultationSummary = '/consultation-summary';
   static const String editProfile = '/edit-profile';
   static const String carePlan = '/care-plan';
   static const String notifications = '/notifications';

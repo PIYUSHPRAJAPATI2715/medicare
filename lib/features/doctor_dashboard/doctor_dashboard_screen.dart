@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/routes/app_routes.dart';
+import '../../data/mock/mock_data.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/prescription_provider.dart';
+import 'doctor_prescription_writer_sheet.dart';
 
 class DoctorDashboardScreen extends ConsumerStatefulWidget {
   const DoctorDashboardScreen({super.key});
@@ -210,44 +213,108 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
             ),
             const SizedBox(height: 12),
 
-            Row(
-              children: [
-                _quickToolTile(
-                  icon: Icons.videocam_rounded,
-                  label: 'Instant Call',
-                  color: AppColors.primary,
-                  onTap: () => Navigator.of(context).pushNamed(AppRoutes.videoCall),
-                ),
-                const SizedBox(width: 10),
-                _quickToolTile(
-                  icon: Icons.chat_bubble_rounded,
-                  label: 'Patient Chats',
-                  color: const Color(0xFF0284C7),
-                  onTap: () => Navigator.of(context).pushNamed(AppRoutes.chat),
-                ),
-                const SizedBox(width: 10),
-                _quickToolTile(
-                  icon: Icons.calendar_month_rounded,
-                  label: 'Schedule',
-                  color: const Color(0xFF8B5CF6),
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Doctor Schedule & Slots configured.')),
-                    );
-                  },
-                ),
-                const SizedBox(width: 10),
-                _quickToolTile(
-                  icon: Icons.attach_money_rounded,
-                  label: 'Fee Settings',
-                  color: const Color(0xFF10B981),
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Current consultation fee: ₹500/session')),
-                    );
-                  },
-                ),
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _quickToolTile(
+                    icon: Icons.edit_note_rounded,
+                    label: 'Write Rx',
+                    color: const Color(0xFF0E9F6E),
+                    onTap: () {
+                      DoctorPrescriptionWriterSheet.show(context, doctor: MockData.doctors[0]);
+                    },
+                  ),
+                  const SizedBox(width: 10),
+                  _quickToolTile(
+                    icon: Icons.videocam_rounded,
+                    label: 'Instant Call',
+                    color: AppColors.primary,
+                    onTap: () => Navigator.of(context).pushNamed(AppRoutes.videoCall),
+                  ),
+                  const SizedBox(width: 10),
+                  _quickToolTile(
+                    icon: Icons.chat_bubble_rounded,
+                    label: 'Patient Chats',
+                    color: const Color(0xFF0284C7),
+                    onTap: () => Navigator.of(context).pushNamed(AppRoutes.chat),
+                  ),
+                  const SizedBox(width: 10),
+                  _quickToolTile(
+                    icon: Icons.calendar_month_rounded,
+                    label: 'Schedule',
+                    color: const Color(0xFF8B5CF6),
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Doctor Schedule & Slots configured.')),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 10),
+                  _quickToolTile(
+                    icon: Icons.attach_money_rounded,
+                    label: 'Fee Settings',
+                    color: const Color(0xFF10B981),
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Current consultation fee: ₹500/session')),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Pending Rx Banner if any
+            Consumer(
+              builder: (context, ref, _) {
+                final pending = ref.watch(prescriptionProvider).pendingDrafts;
+                if (pending.isEmpty) return const SizedBox.shrink();
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.pending_actions_rounded, color: Color(0xFFD97706), size: 26),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Prescription Pending Delivery',
+                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: Color(0xFF92400E)),
+                            ),
+                            Text(
+                              'Consultation ended. Patient is waiting for signed prescription.',
+                              style: TextStyle(fontSize: 11, color: Color(0xFFB45309)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () {
+                          DoctorPrescriptionWriterSheet.show(context, doctor: MockData.doctors[0]);
+                        },
+                        child: const Text('Sign Rx', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
 
             const SizedBox(height: 24),

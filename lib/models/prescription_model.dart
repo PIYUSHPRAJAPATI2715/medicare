@@ -56,6 +56,12 @@ class PrescribedMedicine {
   }
 }
 
+enum PrescriptionLifecycleStatus {
+  drafting,
+  issued,
+  completed,
+}
+
 enum OrderFulfillmentType {
   none,
   orderedOnline,
@@ -84,6 +90,10 @@ class PrescriptionModel {
   final String patientAgeGender;
   final String diagnosis;
   final String clinicalNotes;
+  final String adviceNotes;
+  final String hospitalName;
+  final String digitalSignatureToken;
+  final PrescriptionLifecycleStatus status;
   final List<PrescribedMedicine> medicines;
   final DateTime issuedAt;
   final DateTime? followUpDate;
@@ -107,6 +117,10 @@ class PrescriptionModel {
     this.patientAgeGender = '30 Y / Male',
     required this.diagnosis,
     required this.clinicalNotes,
+    this.adviceNotes = 'Drink adequate warm fluids, steam inhalation twice daily, take complete antibiotic course.',
+    this.hospitalName = 'MediCare+ Apex Multi-Specialty Hospital, Jaipur',
+    this.digitalSignatureToken = 'SHA256:VERIFIED-E-SIGN-MCI-2026',
+    this.status = PrescriptionLifecycleStatus.issued,
     required this.medicines,
     required this.issuedAt,
     this.followUpDate,
@@ -122,6 +136,11 @@ class PrescriptionModel {
     OrderFulfillmentType? fulfillmentType,
     PharmacyOrderStatus? pharmacyStatus,
     String? deliveryAddress,
+    PrescriptionLifecycleStatus? status,
+    String? diagnosis,
+    String? clinicalNotes,
+    String? adviceNotes,
+    List<PrescribedMedicine>? medicines,
   }) {
     return PrescriptionModel(
       id: id,
@@ -134,9 +153,13 @@ class PrescriptionModel {
       patientId: patientId,
       patientName: patientName,
       patientAgeGender: patientAgeGender,
-      diagnosis: diagnosis,
-      clinicalNotes: clinicalNotes,
-      medicines: medicines,
+      diagnosis: diagnosis ?? this.diagnosis,
+      clinicalNotes: clinicalNotes ?? this.clinicalNotes,
+      adviceNotes: adviceNotes ?? this.adviceNotes,
+      hospitalName: hospitalName,
+      digitalSignatureToken: digitalSignatureToken,
+      status: status ?? this.status,
+      medicines: medicines ?? this.medicines,
       issuedAt: issuedAt,
       followUpDate: followUpDate,
       fulfillmentType: fulfillmentType ?? this.fulfillmentType,

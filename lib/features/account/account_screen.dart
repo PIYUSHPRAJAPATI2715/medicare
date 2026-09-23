@@ -5,6 +5,8 @@ import '../../core/routes/app_routes.dart';
 import '../../core/animation/animation_utils.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/wallet_provider.dart';
+import '../../providers/prescription_provider.dart';
 import '../../widgets/custom_app_bar.dart';
 
 class AccountScreen extends ConsumerWidget {
@@ -147,6 +149,9 @@ class AccountScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).user;
+    final wallet = ref.watch(walletProvider);
+    final prescriptionState = ref.watch(prescriptionProvider);
+    final rxCount = prescriptionState.prescriptions.length;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -371,19 +376,58 @@ class AccountScreen extends ConsumerWidget {
                     _divider(),
                     _accountNavTile(
                       icon: Icons.folder_shared_outlined,
-                      title: 'Medical Records & Prescriptions',
+                      title: 'My Prescriptions & Records',
+                      subtitle: '$rxCount official digital prescriptions',
+                      trailingBadge: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$rxCount Rx',
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
                       onTap: () {
-                        Navigator.of(context).pushNamed(AppRoutes.chat);
+                        Navigator.of(context).pushNamed(AppRoutes.prescriptionsList);
                       },
                     ),
                     _divider(),
                     _accountNavTile(
-                      icon: Icons.payment_rounded,
-                      title: 'Payments & HealthCash',
+                      icon: Icons.account_balance_wallet_rounded,
+                      title: 'MediCare HealthPay Wallet',
+                      subtitle: 'Balance: ₹${wallet.balance.toStringAsFixed(2)}',
+                      trailingBadge: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '₹${wallet.balance.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            color: Color(0xFF15803D),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
                       onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('HealthCash Balance: ₹450 available')),
-                        );
+                        Navigator.of(context).pushNamed(AppRoutes.wallet);
+                      },
+                    ),
+                    _divider(),
+                    _accountNavTile(
+                      icon: Icons.card_membership_rounded,
+                      title: 'Care Plans & Subscriptions',
+                      subtitle: 'Manage membership & discount benefits',
+                      onTap: () {
+                        Navigator.of(context).pushNamed(AppRoutes.carePlan);
                       },
                     ),
                   ],
@@ -509,6 +553,7 @@ class AccountScreen extends ConsumerWidget {
     required IconData icon,
     required String title,
     String? subtitle,
+    Widget? trailingBadge,
     required VoidCallback onTap,
   }) {
     return AppBouncyTouch(
@@ -529,7 +574,16 @@ class AccountScreen extends ConsumerWidget {
         subtitle: subtitle != null
             ? Text(subtitle, style: const TextStyle(fontSize: 11.5, color: AppColors.textTertiary, fontWeight: FontWeight.w500))
             : null,
-        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 13, color: AppColors.textTertiary),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (trailingBadge != null) ...[
+              trailingBadge,
+              const SizedBox(width: 8),
+            ],
+            const Icon(Icons.arrow_forward_ios_rounded, size: 13, color: AppColors.textTertiary),
+          ],
+        ),
       ),
     );
   }

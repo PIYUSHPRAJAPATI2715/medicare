@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/routes/app_routes.dart';
+import '../../models/wallet_model.dart';
 import '../../providers/appointment_provider.dart';
+import '../../providers/wallet_provider.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
 
@@ -14,14 +16,35 @@ class PaymentScreen extends ConsumerStatefulWidget {
 }
 
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
-  String _selectedMethod = 'upi_gpay';
+  String _selectedMethod = 'wallet';
   bool _isProcessing = false;
 
   void _handlePayment() async {
+    final appointmentState = ref.read(appointmentProvider);
+    final draft = appointmentState.draft;
+    final doctor = draft.doctor;
+
     setState(() => _isProcessing = true);
-    await Future.delayed(const Duration(milliseconds: 1000));
+    await Future.delayed(const Duration(milliseconds: 900));
 
     if (!mounted) return;
+
+    if (_selectedMethod == 'wallet') {
+      final success = ref.read(walletProvider.notifier).payWithWallet(
+        draft.totalAmount,
+        'Consultation: ${doctor?.name ?? "Doctor"}',
+        category: WalletTransactionCategory.consultation,
+        referenceId: 'APPT-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+      );
+      if (!success) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Insufficient Wallet balance. Please top up or choose another payment method.')),
+        );
+        return;
+      }
+    }
+
     setState(() => _isProcessing = false);
 
     ref.read(appointmentProvider.notifier).confirmBooking();
@@ -31,6 +54,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   @override
   Widget build(BuildContext context) {
     final appointmentState = ref.watch(appointmentProvider);
+    final wallet = ref.watch(walletProvider);
     final draft = appointmentState.draft;
     final doctor = draft.doctor;
 
@@ -112,10 +136,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             const SizedBox(height: 12),
 
             _paymentOptionTile(
+              id: 'wallet',
+              title: 'MediCare+ HealthPay Wallet',
+              subtitle: 'Balance: ₹${wallet.balance.toStringAsFixed(0)} • Instant 1-Tap Pay',
+              icon: Icons.account_balance_wallet_rounded,
+              isRecommended: true,
+            ),
+            _paymentOptionTile(
               id: 'upi_gpay',
               title: 'Google Pay / PhonePe / BHIM UPI',
               subtitle: 'Pay directly using any installed UPI App',
-              icon: Icons.account_balance_wallet_rounded,
+              icon: Icons.qr_code_rounded,
             ),
             _paymentOptionTile(
               id: 'card',
