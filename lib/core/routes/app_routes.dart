@@ -28,6 +28,8 @@ class AppRoutes {
   static const String videoCall = '/video-call';
   static const String audioCall = '/audio-call';
   static const String chat = '/chat';
+  static const String prescriptionDetail = '/prescription-detail';
+  static const String pharmacyCheckout = '/pharmacy-checkout';
 
   // Account Sub-pages
   static const String appointmentsHistory = '/appointments-history';

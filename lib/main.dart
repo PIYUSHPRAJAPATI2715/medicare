@@ -25,6 +25,9 @@ import 'features/account/help_support_screen.dart';
 import 'features/auth/doctor_registration_screen.dart';
 import 'features/doctor_dashboard/doctor_dashboard_screen.dart';
 import 'features/admin/admin_dashboard_screen.dart';
+import 'features/prescription/prescription_detail_screen.dart';
+import 'features/prescription/pharmacy_checkout_screen.dart';
+import 'models/prescription_model.dart';
 
 
 void main() {
@@ -78,6 +81,46 @@ class MediCareApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const AudioCallScreen());
           case AppRoutes.chat:
             return MaterialPageRoute(builder: (_) => const DoctorChatScreen());
+          case AppRoutes.prescriptionDetail:
+            final rx = settings.arguments as PrescriptionModel?;
+            if (rx != null) {
+              return MaterialPageRoute(
+                  builder: (_) => PrescriptionDetailScreen(prescription: rx));
+            }
+            return MaterialPageRoute(
+              builder: (ctx) => Consumer(
+                builder: (context, ref, _) {
+                  final latestRx =
+                      ref.watch(prescriptionProvider).latestPrescription;
+                  if (latestRx != null) {
+                    return PrescriptionDetailScreen(prescription: latestRx);
+                  }
+                  return const Scaffold(
+                    body: Center(child: Text('No prescription found')),
+                  );
+                },
+              ),
+            );
+          case AppRoutes.pharmacyCheckout:
+            final rx = settings.arguments as PrescriptionModel?;
+            if (rx != null) {
+              return MaterialPageRoute(
+                  builder: (_) => PharmacyCheckoutScreen(prescription: rx));
+            }
+            return MaterialPageRoute(
+              builder: (ctx) => Consumer(
+                builder: (context, ref, _) {
+                  final latestRx =
+                      ref.watch(prescriptionProvider).latestPrescription;
+                  if (latestRx != null) {
+                    return PharmacyCheckoutScreen(prescription: latestRx);
+                  }
+                  return const Scaffold(
+                    body: Center(child: Text('No prescription for checkout')),
+                  );
+                },
+              ),
+            );
           case AppRoutes.appointmentsHistory:
             return MaterialPageRoute(builder: (_) => const AppointmentsHistoryScreen());
           case AppRoutes.editProfile:

@@ -12,6 +12,7 @@ import '../../data/mock/mock_data.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/rating_badge.dart';
 import '../../widgets/time_slot_chip.dart';
+import '../subscription/subscription_paywall_dialog.dart';
 
 class DoctorDetailScreen extends ConsumerStatefulWidget {
   final String doctorId;
@@ -48,6 +49,22 @@ class _DoctorDetailScreenState extends ConsumerState<DoctorDetailScreen> {
   void _proceedToBooking() {
     final doctor = ref.read(doctorByIdProvider(widget.doctorId)) ?? MockData.doctors[0];
     final selectedDate = _availableDates[_selectedDateIndex];
+
+    if (_selectedType == ConsultationType.online || _selectedType == ConsultationType.video) {
+      SubscriptionPaywallDialog.checkAndProceed(
+        context,
+        ref,
+        doctorName: doctor.name,
+        onProceed: () {
+          final aptNotifier = ref.read(appointmentProvider.notifier);
+          aptNotifier.startBooking(doctor, type: _selectedType);
+          aptNotifier.updateDraftDate(selectedDate);
+          aptNotifier.updateDraftSlot(_selectedSlot);
+          Navigator.of(context).pushNamed(AppRoutes.booking);
+        },
+      );
+      return;
+    }
 
     final aptNotifier = ref.read(appointmentProvider.notifier);
     aptNotifier.startBooking(doctor, type: _selectedType);

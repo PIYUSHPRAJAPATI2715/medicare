@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/routes/app_routes.dart';
-import '../../models/doctor_model.dart';
-import '../../models/chat_message_model.dart';
-import '../../providers/chat_provider.dart';
+import '../../core/theme/app_colors.dart';
 import '../../data/mock/mock_data.dart';
+import '../../models/chat_message_model.dart';
+import '../../models/doctor_model.dart';
+import '../../providers/chat_provider.dart';
+import '../../providers/prescription_provider.dart';
+import '../prescription/prescription_detail_screen.dart';
+import '../subscription/subscription_paywall_dialog.dart';
 
 class DoctorChatScreen extends ConsumerStatefulWidget {
   final DoctorModel? doctor;
@@ -21,13 +24,21 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
   final _scrollController = ScrollController();
 
   void _sendMessage() {
-    final text = _messageController.text;
-    if (text.trim().isEmpty) return;
+    final doc = widget.doctor ?? MockData.doctors[4];
+    SubscriptionPaywallDialog.checkAndProceed(
+      context,
+      ref,
+      doctorName: doc.name,
+      onProceed: () {
+        final text = _messageController.text;
+        if (text.trim().isEmpty) return;
 
-    ref.read(chatProvider.notifier).sendMessage(text);
-    _messageController.clear();
+        ref.read(chatProvider.notifier).sendMessage(text);
+        _messageController.clear();
 
-    _scrollToBottom();
+        _scrollToBottom();
+      },
+    );
   }
 
   void _scrollToBottom() {
@@ -54,7 +65,8 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Attach Medical Document', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const Text('Attach Medical Document',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -65,7 +77,9 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
                     label: 'Lab Report',
                     onTap: () {
                       Navigator.pop(context);
-                      ref.read(chatProvider.notifier).sendAttachment('blood_test_report.pdf', '1.8 MB');
+                      ref
+                          .read(chatProvider.notifier)
+                          .sendAttachment('blood_test_report.pdf', '1.8 MB');
                       _scrollToBottom();
                     },
                   ),
@@ -75,7 +89,8 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
                     label: 'Prescription',
                     onTap: () {
                       Navigator.pop(context);
-                      ref.read(chatProvider.notifier).sendAttachment('doctor_prescription.pdf', '2.2 MB');
+                      ref.read(chatProvider.notifier).sendAttachment(
+                          'doctor_prescription.pdf', '2.2 MB');
                       _scrollToBottom();
                     },
                   ),
@@ -85,7 +100,9 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
                     label: 'Skin Photo',
                     onTap: () {
                       Navigator.pop(context);
-                      ref.read(chatProvider.notifier).sendAttachment('rash_photo.jpg', '3.1 MB');
+                      ref
+                          .read(chatProvider.notifier)
+                          .sendAttachment('rash_photo.jpg', '3.1 MB');
                       _scrollToBottom();
                     },
                   ),
@@ -111,11 +128,13 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
         children: [
           CircleAvatar(
             radius: 28,
-            backgroundColor: color.withValues(alpha: 0.15),
+            backgroundColor: color.withOpacity(0.15),
             child: Icon(icon, color: color, size: 28),
           ),
           const SizedBox(height: 6),
-          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(label,
+              style:
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -155,7 +174,8 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
                     width: 38,
                     height: 38,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, size: 30),
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.person, size: 30),
                   ),
                 ),
                 Positioned(
@@ -180,13 +200,19 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
                 children: [
                   Text(
                     doc.name,
-                    style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    style: const TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const Text(
-                    'Online',
-                    style: TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w600),
+                    'Online • Agora Live Session',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.success,
+                        fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -194,19 +220,73 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
           ],
         ),
         actions: [
+          // Audio Call button with Paywall Guard
           IconButton(
-            icon: const Icon(Icons.phone_rounded, color: AppColors.primary, size: 22),
+            tooltip: 'Agora Audio Call',
+            icon: const Icon(Icons.phone_rounded,
+                color: AppColors.primary, size: 22),
             onPressed: () {
-              Navigator.of(context).pushNamed(AppRoutes.audioCall);
+              SubscriptionPaywallDialog.checkAndProceed(
+                context,
+                ref,
+                doctorName: doc.name,
+                onProceed: () {
+                  Navigator.of(context).pushNamed(AppRoutes.audioCall);
+                },
+              );
             },
           ),
+          // Video Call button with Paywall Guard
           IconButton(
-            icon: const Icon(Icons.videocam_rounded, color: AppColors.primary, size: 24),
+            tooltip: 'Agora Video Call',
+            icon: const Icon(Icons.videocam_rounded,
+                color: AppColors.primary, size: 24),
             onPressed: () {
-              Navigator.of(context).pushNamed(AppRoutes.videoCall);
+              SubscriptionPaywallDialog.checkAndProceed(
+                context,
+                ref,
+                doctorName: doc.name,
+                onProceed: () {
+                  Navigator.of(context).pushNamed(AppRoutes.videoCall);
+                },
+              );
             },
           ),
-          const SizedBox(width: 6),
+          // Doctor Digital Rx button
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: TextButton.icon(
+              style: TextButton.styleFrom(
+                backgroundColor: const Color(0xFFDEF7EC),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () {
+                final newRx = ref
+                    .read(prescriptionProvider.notifier)
+                    .generatePrescriptionForConsultation(doctor: doc);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (ctx) =>
+                        PrescriptionDetailScreen(prescription: newRx),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.medication_rounded,
+                  size: 15, color: Color(0xFF0E9F6E)),
+              label: const Text(
+                'Rx',
+                style: TextStyle(
+                  color: Color(0xFF0E9F6E),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
       body: Column(
@@ -232,7 +312,10 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
                 children: [
                   Text(
                     '${doc.name} is typing...',
-                    style: const TextStyle(fontSize: 12, color: AppColors.primary, fontStyle: FontStyle.italic),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.primary,
+                        fontStyle: FontStyle.italic),
                   ),
                 ],
               ),
@@ -246,7 +329,7 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
               border: const Border(top: BorderSide(color: AppColors.border)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
+                  color: Colors.black.withOpacity(0.04),
                   blurRadius: 10,
                   offset: const Offset(0, -2),
                 ),
@@ -257,7 +340,8 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.attach_file_rounded, color: AppColors.textSecondary),
+                    icon: const Icon(Icons.attach_file_rounded,
+                        color: AppColors.textSecondary),
                     onPressed: _showAttachmentOptions,
                   ),
                   Expanded(
@@ -267,10 +351,13 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
                       onSubmitted: (_) => _sendMessage(),
                       decoration: InputDecoration(
                         hintText: 'Type a message...',
-                        hintStyle: const TextStyle(color: AppColors.textTertiary, fontSize: 14),
+                        hintStyle: const TextStyle(
+                            color: AppColors.textTertiary, fontSize: 14),
                         filled: true,
-                        fillColor: AppColors.surfaceVariant.withValues(alpha: 0.6),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        fillColor:
+                            AppColors.surfaceVariant.withOpacity(0.6),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(24),
                           borderSide: BorderSide.none,
@@ -288,7 +375,8 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
                         color: AppColors.primary,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                      child: const Icon(Icons.send_rounded,
+                          color: Colors.white, size: 20),
                     ),
                   ),
                 ],
@@ -306,20 +394,23 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment: isDoctor ? MainAxisAlignment.start : MainAxisAlignment.end,
+        mainAxisAlignment:
+            isDoctor ? MainAxisAlignment.start : MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (isDoctor) ...[
             const CircleAvatar(
               radius: 14,
               backgroundColor: AppColors.primaryLight,
-              child: Icon(Icons.medical_services_rounded, size: 14, color: AppColors.primary),
+              child: Icon(Icons.medical_services_rounded,
+                  size: 14, color: AppColors.primary),
             ),
             const SizedBox(width: 8),
           ],
           Flexible(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: isDoctor ? Colors.white : AppColors.primary,
                 borderRadius: BorderRadius.only(
@@ -328,56 +419,80 @@ class _DoctorChatScreenState extends ConsumerState<DoctorChatScreen> {
                   bottomLeft: Radius.circular(isDoctor ? 4 : 16),
                   bottomRight: Radius.circular(isDoctor ? 16 : 4),
                 ),
-                border: isDoctor ? Border.all(color: AppColors.borderLight) : null,
+                border:
+                    isDoctor ? Border.all(color: AppColors.borderLight) : null,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
+                    color: Colors.black.withOpacity(0.03),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
               child: Column(
-                crossAxisAlignment: isDoctor ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+                crossAxisAlignment:
+                    isDoctor ? CrossAxisAlignment.start : CrossAxisAlignment.end,
                 children: [
                   if (msg.hasAttachment) ...[
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      margin: const EdgeInsets.only(bottom: 8),
-                      decoration: BoxDecoration(
-                        color: isDoctor ? AppColors.surfaceVariant : Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.picture_as_pdf_rounded,
-                            color: isDoctor ? Colors.red : Colors.white,
-                            size: 26,
-                          ),
-                          const SizedBox(width: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                msg.attachmentName ?? 'Document.pdf',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12.5,
-                                  color: isDoctor ? AppColors.textPrimary : Colors.white,
+                    GestureDetector(
+                      onTap: () {
+                        // Open prescription if it is a prescription attachment
+                        final rx = ref.read(prescriptionProvider).latestPrescription;
+                        if (rx != null) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (ctx) =>
+                                  PrescriptionDetailScreen(prescription: rx),
+                            ),
+                          );
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: isDoctor
+                              ? AppColors.surfaceVariant
+                              : Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.picture_as_pdf_rounded,
+                              color: isDoctor ? Colors.red : Colors.white,
+                              size: 26,
+                            ),
+                            const SizedBox(width: 10),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  msg.attachmentName ?? 'Document.pdf',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12.5,
+                                    color: isDoctor
+                                        ? AppColors.textPrimary
+                                        : Colors.white,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                msg.attachmentSize ?? '2.4 MB',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  color: isDoctor ? AppColors.textTertiary : Colors.white70,
+                                Text(
+                                  'Tap to view / Order Tablets',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: isDoctor
+                                        ? AppColors.primary
+                                        : Colors.white70,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],

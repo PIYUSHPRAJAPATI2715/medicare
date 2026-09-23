@@ -19,7 +19,7 @@ class MockData {
     avatarUrl: AppConstants.patientAvatar,
     gender: 'Male',
     dob: '15 Aug 1994',
-    hasActiveCarePlan: true,
+    hasActiveCarePlan: false,
   );
 
   // Current Doctor User (for Doctor Role View)

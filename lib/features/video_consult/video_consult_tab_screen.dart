@@ -8,6 +8,7 @@ import '../../providers/doctor_provider.dart';
 import '../../providers/appointment_provider.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/doctor_card.dart';
+import '../subscription/subscription_paywall_dialog.dart';
 
 class VideoConsultTabScreen extends ConsumerWidget {
   const VideoConsultTabScreen({super.key});
@@ -277,11 +278,18 @@ class VideoConsultTabScreen extends ConsumerWidget {
                     Navigator.of(context).pushNamed(AppRoutes.doctorDetail, arguments: doc.id);
                   },
                   onConsultNow: () {
-                    ref.read(appointmentProvider.notifier).startBooking(
-                          doc,
-                          type: ConsultationType.video,
-                        );
-                    Navigator.of(context).pushNamed(AppRoutes.booking);
+                    SubscriptionPaywallDialog.checkAndProceed(
+                      context,
+                      ref,
+                      doctorName: doc.name,
+                      onProceed: () {
+                        ref.read(appointmentProvider.notifier).startBooking(
+                              doc,
+                              type: ConsultationType.video,
+                            );
+                        Navigator.of(context).pushNamed(AppRoutes.booking);
+                      },
+                    );
                   },
                 ),
               );

@@ -8,6 +8,7 @@ import '../../providers/appointment_provider.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/appointment_card.dart';
 import '../../widgets/empty_state_view.dart';
+import '../subscription/subscription_paywall_dialog.dart';
 
 class AppointmentsHistoryScreen extends ConsumerStatefulWidget {
   const AppointmentsHistoryScreen({super.key});
@@ -140,7 +141,14 @@ class _AppointmentsHistoryScreenState extends ConsumerState<AppointmentsHistoryS
                               appointment: apt,
                               onJoinConsultation: () {
                                 if (apt.type == ConsultationType.video) {
-                                  Navigator.of(context).pushNamed(AppRoutes.videoCall);
+                                  SubscriptionPaywallDialog.checkAndProceed(
+                                    context,
+                                    ref,
+                                    doctorName: apt.doctor.name,
+                                    onProceed: () {
+                                      Navigator.of(context).pushNamed(AppRoutes.videoCall);
+                                    },
+                                  );
                                 } else {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(content: Text('Hospital directions opened: ${apt.clinicName}')),

@@ -31,7 +31,7 @@ class UserModel {
     required this.avatarUrl,
     this.gender = 'Male',
     this.dob = '15 Aug 1994',
-    this.hasActiveCarePlan = true,
+    this.hasActiveCarePlan = false,
     this.specialization,
     this.experienceYears,
     this.clinicName,

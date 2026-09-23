@@ -50,4 +50,11 @@ class AppConstants {
   // Patient Avatar
   static const String patientAvatar =
       'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80';
+
+  // Agora Real-Time Communication Credentials
+  static const String agoraAppId = '2d1a79eb047e4bcb93dadfacc4abe0a3';
+  static const String agoraAppCertificate = 'a0d6634f5dda439e8d4aee0e7135db8f';
+  static const String agoraAppBuilderId = 'appbuilder-18d042b8a93f08e894cf';
+  static const String agoraDefaultChannel = 'appbuilder-18d042b8a93f08e894cf';
 }
+
