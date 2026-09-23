@@ -1,11 +1,9 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Globe, Bell, Shield, Stethoscope, RefreshCw, Menu } from 'lucide-react';
+import { Globe, Bell, Shield, Stethoscope, Menu } from 'lucide-react';
 
 export default function Navbar({ onToggleMobileMenu }) {
-  const { user, login } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
   return (
@@ -31,22 +29,6 @@ export default function Navbar({ onToggleMobileMenu }) {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Quick Role Switcher Button */}
-        <button
-          onClick={() => {
-            const nextRole = isAdmin ? 'doctor' : 'admin';
-            login(nextRole);
-            navigate(nextRole === 'doctor' ? '/doctor/dashboard' : '/admin/dashboard');
-          }}
-          className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition border border-slate-200"
-          title="Switch view mode between Doctor and Admin"
-        >
-          <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
-          <span className="hidden sm:inline">Switch to {isAdmin ? 'Doctor View' : 'Admin View'}</span>
-          <span className="sm:hidden">{isAdmin ? 'Doctor' : 'Admin'}</span>
-        </button>
-
-        <div className="hidden sm:block w-px h-6 bg-slate-200" />
 
         {/* Notifications */}
         <button className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 relative transition">

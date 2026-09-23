@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Stethoscope, ShieldCheck, Lock, Mail, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Stethoscope, ShieldCheck, Lock, Mail, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
   const [activeTab, setActiveTab] = useState('doctor'); // 'doctor' | 'admin'
-  const [email, setEmail] = useState('dr.rajesh@drconnects24.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { user, login } = useAuth();
   const navigate = useNavigate();
@@ -19,11 +19,6 @@ export default function LoginPage() {
 
   const handleTabSwitch = (role) => {
     setActiveTab(role);
-    if (role === 'doctor') {
-      setEmail('dr.rajesh@drconnects24.com');
-    } else {
-      setEmail('admin@drconnects24.com');
-    }
   };
 
   const handleSubmit = (e) => {
@@ -149,35 +144,6 @@ export default function LoginPage() {
             )}
           </button>
         </form>
-
-        {/* Quick Demo Access Buttons */}
-        <div className="mt-8 pt-6 border-t border-slate-700/50">
-          <p className="text-xs font-semibold text-slate-400 text-center mb-3">Quick 1-Click Access:</p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                login('doctor', 'dr.rajesh@drconnects24.com');
-                navigate('/doctor/dashboard');
-              }}
-              className="py-2 px-3 bg-slate-900 hover:bg-slate-700/80 border border-slate-700 rounded-xl text-xs font-semibold text-slate-300 flex items-center justify-center gap-1.5 transition"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
-              Demo Doctor
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                login('admin', 'admin@drconnects24.com');
-                navigate('/admin/dashboard');
-              }}
-              className="py-2 px-3 bg-slate-900 hover:bg-slate-700/80 border border-slate-700 rounded-xl text-xs font-semibold text-slate-300 flex items-center justify-center gap-1.5 transition"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
-              Demo Admin
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Footer copyright */}
