@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { fetchHospitals } from '../../services/api';
+import { initialHospitals } from '../../data/mockData';
 import { Building2, MapPin, Star, Plus } from 'lucide-react';
 
 export default function HospitalsPage() {
-  const [hospitals, setHospitals] = useState([]);
+  const [hospitals, setHospitals] = useState(initialHospitals);
 
   useEffect(() => {
     fetchHospitals().then(res => {
-      if (res.data) setHospitals(res.data);
+      if (res && res.data && Array.isArray(res.data)) setHospitals(res.data);
     }).catch(console.error);
   }, []);
 

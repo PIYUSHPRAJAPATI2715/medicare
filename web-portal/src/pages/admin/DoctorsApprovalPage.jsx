@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { fetchDoctors, fetchPendingDoctors, verifyDoctor } from '../../services/api';
+import { initialDoctors } from '../../data/mockData';
 import { CheckCircle2, XCircle, FileText, ExternalLink, ShieldCheck, Clock, Search } from 'lucide-react';
 
 export default function DoctorsApprovalPage() {
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'pending'
-  const [doctors, setDoctors] = useState([]);
-  const [pendingDoctors, setPendingDoctors] = useState([]);
+  const [doctors, setDoctors] = useState(initialDoctors);
+  const [pendingDoctors, setPendingDoctors] = useState(initialDoctors.filter(d => !d.isVerified));
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [rejectionNotes, setRejectionNotes] = useState('');
   const [search, setSearch] = useState('');
@@ -17,10 +18,10 @@ export default function DoctorsApprovalPage() {
   const loadData = async () => {
     try {
       const docRes = await fetchDoctors();
-      if (docRes.data) setDoctors(docRes.data);
+      if (docRes && docRes.data && Array.isArray(docRes.data)) setDoctors(docRes.data);
 
       const pendingRes = await fetchPendingDoctors();
-      if (pendingRes.data) setPendingDoctors(pendingRes.data);
+      if (pendingRes && pendingRes.data && Array.isArray(pendingRes.data)) setPendingDoctors(pendingRes.data);
     } catch (e) {
       console.error('Error fetching doctors:', e);
     }

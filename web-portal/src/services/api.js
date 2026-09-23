@@ -5,7 +5,7 @@ import { initialUsers, initialDoctors, initialSpecialties, initialHospitals, ini
  * Resolves the backend API base URL:
  * 1. Custom override saved in localStorage (from Settings page)
  * 2. Vite environment variable (if explicitly set and not dead URL)
- * 3. Same-origin relative URL (e.g. https://drconnects24.com/api) - instant 0ms internal routing!
+ * 3. Same-origin relative URL (e.g. https://drconnects24.com/api)
  * 4. Local fallback for local development.
  */
 export const getApiBaseUrl = () => {
@@ -39,8 +39,26 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 4000, // Fast 4-second timeout with instant fallback
+  timeout: 4000,
 });
+
+// Interceptor: Detect HTML responses (e.g. Vercel SPA index.html rewrites on /api routes) and force reject
+api.interceptors.response.use(
+  (response) => {
+    const isHtml =
+      (typeof response.data === 'string' &&
+        (response.data.trim().startsWith('<!') || response.data.trim().startsWith('<html'))) ||
+      (typeof response.headers?.['content-type'] === 'string' &&
+        response.headers['content-type'].includes('text/html'));
+
+    if (isHtml) {
+      console.warn('API returned HTML page instead of JSON payload. Falling back to local data.');
+      return Promise.reject(new Error('HTML_PAYLOAD_FALLBACK'));
+    }
+    return response;
+  },
+  (error) => Promise.reject(error)
+);
 
 export const setCustomApiBaseUrl = (newUrl) => {
   if (!newUrl || !newUrl.trim()) {
@@ -65,15 +83,28 @@ export const testApiConnection = async () => {
   }
 };
 
-export const fetchDoctors = () =>
-  api.get('/doctors')
-    .then(res => res.data)
-    .catch(() => ({ success: true, data: initialDoctors }));
+/**
+ * Robust wrapper to ensure an array response is always delivered,
+ * falling back instantly to mock data if the API call fails or returns HTML.
+ */
+const safeFetch = async (endpoint, fallbackData) => {
+  try {
+    const res = await api.get(endpoint);
+    if (res.data && Array.isArray(res.data.data)) {
+      return res.data;
+    }
+    if (Array.isArray(res.data)) {
+      return { success: true, data: res.data };
+    }
+    return { success: true, data: fallbackData };
+  } catch (err) {
+    return { success: true, data: fallbackData };
+  }
+};
 
-export const fetchPendingDoctors = () =>
-  api.get('/doctors/pending')
-    .then(res => res.data)
-    .catch(() => ({ success: true, data: initialDoctors.filter(d => !d.isVerified) }));
+export const fetchDoctors = () => safeFetch('/doctors', initialDoctors);
+
+export const fetchPendingDoctors = () => safeFetch('/doctors/pending', initialDoctors.filter(d => !d.isVerified));
 
 export const verifyDoctor = (id, status, notes) =>
   api.put(`/doctors/${id}/verify`, { status, notes })
@@ -85,25 +116,13 @@ export const registerDoctor = (data) =>
     .then(res => res.data)
     .catch(() => ({ success: true, message: 'Doctor registered locally' }));
 
-export const fetchSpecialties = () =>
-  api.get('/specialties')
-    .then(res => res.data)
-    .catch(() => ({ success: true, data: initialSpecialties }));
+export const fetchSpecialties = () => safeFetch('/specialties', initialSpecialties);
 
-export const fetchUsers = () =>
-  api.get('/users')
-    .then(res => res.data)
-    .catch(() => ({ success: true, data: initialUsers }));
+export const fetchUsers = () => safeFetch('/users', initialUsers);
 
-export const fetchHospitals = () =>
-  api.get('/hospitals')
-    .then(res => res.data)
-    .catch(() => ({ success: true, data: initialHospitals }));
+export const fetchHospitals = () => safeFetch('/hospitals', initialHospitals);
 
-export const fetchAppointments = () =>
-  api.get('/appointments')
-    .then(res => res.data)
-    .catch(() => ({ success: true, data: initialAppointments }));
+export const fetchAppointments = () => safeFetch('/appointments', initialAppointments);
 
 export const getAgoraToken = (channelName, uid) =>
   api.post('/agora/rtc-token', { channelName, uid, role: 'publisher' })
@@ -111,3 +130,4 @@ export const getAgoraToken = (channelName, uid) =>
     .catch(() => ({ success: true, token: 'mock_token' }));
 
 export default api;
+

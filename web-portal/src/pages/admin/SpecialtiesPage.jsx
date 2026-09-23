@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { fetchSpecialties } from '../../services/api';
+import { initialSpecialties } from '../../data/mockData';
 import { Stethoscope, Plus, Search } from 'lucide-react';
 
 export default function SpecialtiesPage() {
-  const [specialties, setSpecialties] = useState([]);
+  const [specialties, setSpecialties] = useState(initialSpecialties);
 
   useEffect(() => {
     fetchSpecialties().then(res => {
-      if (res.data) setSpecialties(res.data);
+      if (res && res.data && Array.isArray(res.data)) setSpecialties(res.data);
     }).catch(console.error);
   }, []);
 

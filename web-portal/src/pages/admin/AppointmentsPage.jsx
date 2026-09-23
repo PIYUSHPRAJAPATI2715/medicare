@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { fetchAppointments } from '../../services/api';
+import { initialAppointments } from '../../data/mockData';
 import { Calendar, Video, MapPin, Clock } from 'lucide-react';
 
 export default function AppointmentsPage() {
-  const [appointments, setAppointments] = useState([]);
+  const [appointments, setAppointments] = useState(initialAppointments);
 
   useEffect(() => {
     fetchAppointments().then(res => {
-      if (res.data) setAppointments(res.data);
+      if (res && res.data && Array.isArray(res.data)) setAppointments(res.data);
     }).catch(console.error);
   }, []);
 
