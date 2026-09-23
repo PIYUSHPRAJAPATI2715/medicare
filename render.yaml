@@ -23,6 +23,9 @@ services:
     rootDir: web-portal
     buildCommand: npm install && npm run build
     publishDir: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://medicare-backend-api.onrender.com/api
     routes:
       - type: rewrite
         source: /*

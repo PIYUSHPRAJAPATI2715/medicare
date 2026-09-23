@@ -1,4 +1,11 @@
-const API_BASE = 'http://localhost:5050/api';
+const getApiBase = () => {
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return 'https://medicare-backend-api.onrender.com/api';
+  }
+  return import.meta.env?.VITE_API_URL || 'http://localhost:5050/api';
+};
+
+const API_BASE = getApiBase();
 
 export async function fetchApi(endpoint, options = {}) {
   try {

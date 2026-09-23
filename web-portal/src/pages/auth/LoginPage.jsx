@@ -8,8 +8,14 @@ export default function LoginPage() {
   const [email, setEmail] = useState('dr.rajesh@drconnects24.com');
   const [password, setPassword] = useState('password123');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { user, login } = useAuth();
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (user) {
+      navigate(user.role === 'doctor' ? '/doctor/dashboard' : '/admin/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleTabSwitch = (role) => {
     setActiveTab(role);

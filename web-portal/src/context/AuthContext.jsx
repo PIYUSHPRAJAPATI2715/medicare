@@ -8,13 +8,7 @@ export const AuthProvider = ({ children }) => {
     if (saved) {
       try { return JSON.parse(saved); } catch (_) {}
     }
-    // Default logged in as Admin for instant access
-    return {
-      name: 'System Administrator',
-      email: 'admin@drconnects24.com',
-      role: 'admin',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-    };
+    return null;
   });
 
   const login = (role, email, name) => {
