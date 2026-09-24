@@ -3,9 +3,18 @@
   "outputDirectory": "web-portal/dist",
   "framework": "vite",
   "rewrites": [
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
-    }
+    { "source": "/api/auth/login", "destination": "/api/auth?action=login" },
+    { "source": "/api/auth/register-patient", "destination": "/api/auth?action=register-patient" },
+    { "source": "/api/auth/signup", "destination": "/api/auth?action=signup" },
+    { "source": "/api/auth/doctor-register", "destination": "/api/auth?action=doctor-register" },
+    { "source": "/api/auth/doctor-status/:id", "destination": "/api/auth?action=doctor-status&id=:id" },
+    { "source": "/api/auth/doctor-status", "destination": "/api/auth?action=doctor-status" },
+    { "source": "/api/auth/delete-account/:id", "destination": "/api/auth?action=delete-account&id=:id" },
+    { "source": "/api/auth/(.*)", "destination": "/api/auth" },
+    { "source": "/api/wallet/:userId", "destination": "/api/wallet?userId=:userId" },
+    { "source": "/api/subscriptions/:userId", "destination": "/api/subscriptions?userId=:userId" },
+    { "source": "/api/users/:id", "destination": "/api/users?id=:id" },
+    { "source": "/api/doctors/:id", "destination": "/api/doctors?id=:id" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
