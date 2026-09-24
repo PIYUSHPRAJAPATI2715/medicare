@@ -15,70 +15,120 @@ import '../models/user_model.dart';
 import '../data/mock/mock_data.dart';
 
 class ApiService {
-  // ─── Production API (primary) ─────────────────────────────────────────────
+  // ─── Production API ────────────────────────────────────────────────────────
   static const String _productionUrl = 'https://www.drconnects24.com/api';
 
-  // ─── Local fallback candidates (used when production is unreachable) ───────
+  // ─── Local fallback candidates ─────────────────────────────────────────────
   static const List<String> _localCandidateUrls = [
-    'http://127.0.0.1:5050/api',    // USB Android via adb reverse tcp:5050 tcp:5050
-    'http://10.0.2.2:5050/api',     // Android Emulator
+    'http://127.0.0.1:5050/api',      // USB Android via adb reverse tcp:5050 tcp:5050
+    'http://10.0.2.2:5050/api',       // Android Emulator
     'http://192.168.31.111:5050/api', // LAN Wi-Fi
-    'http://localhost:5050/api',    // Web / macOS desktop
+    'http://localhost:5050/api',      // Web / macOS desktop
   ];
 
-  // The currently active base URL — starts with production
-  static String _activeBaseUrl = _productionUrl;
+  /// After the first successful request, the working URL is cached here
+  /// so we NEVER re-probe on every request (avoids 8s timeout punishment)
+  static String? _cachedUrl;
+  static bool _productionProbed = false;
 
-  static String get baseUrl => _activeBaseUrl;
+  static String get baseUrl => _cachedUrl ?? _productionUrl;
 
-  /// Make HTTP request, always try production first, then local candidates.
+  // Paths that only exist on local backend, not on drconnects24.com
+  static const List<String> _localOnlyPaths = [
+    '/auth/login', '/auth/register', '/auth/doctor-register',
+    '/auth/doctor-status', '/users/', '/wallet/', '/subscriptions',
+    '/payments/', '/prescriptions', '/appointments',
+  ];
+
+  static bool _isLocalOnly(String apiPath) =>
+      _localOnlyPaths.any((p) => apiPath.contains(p));
+
+  /// Main request dispatcher:
+  /// 1. If the path is local-only → go directly to local (no 8s wait on prod)
+  /// 2. Otherwise, try prod once, cache result, use cached URL forever after
   static Future<http.Response> _safeRequest(
     Future<http.Response> Function(String url) requestFn, {
-    Duration timeout = const Duration(seconds: 8),
+    Duration timeout = const Duration(seconds: 6),
+    String apiPath = '',
   }) async {
-    // Always try production first regardless of _activeBaseUrl
-    try {
-      debugPrint('📡 [ApiService] → $_productionUrl');
-      final res = await requestFn(_productionUrl).timeout(timeout);
-      if (res.statusCode < 500) {
-        _activeBaseUrl = _productionUrl;
-        debugPrint('✅ [ApiService] ← $_productionUrl (HTTP ${res.statusCode})');
-        return res;
-      }
-    } catch (prodErr) {
-      debugPrint('⚠️ [ApiService] Production unreachable: $prodErr');
+    // Local-only path: skip production probe entirely
+    if (_isLocalOnly(apiPath)) {
+      return _tryLocal(requestFn, timeout: timeout);
     }
 
-    // Production down or 5xx — try local fallbacks
+    // If we already have a cached working URL — use it directly, no probe
+    if (_cachedUrl != null) {
+      try {
+        final res = await requestFn(_cachedUrl!).timeout(timeout);
+        debugPrint('✅ [API] ${_cachedUrl!.contains('drconnects') ? '🌐 Production' : '🖥 Local'} (HTTP ${res.statusCode}) $apiPath');
+        return res;
+      } catch (_) {
+        // Cached URL became unreachable — reset and re-probe below
+        debugPrint('⚠️ [API] Cached URL $_cachedUrl unreachable, re-probing...');
+        _cachedUrl = null;
+        _productionProbed = false;
+      }
+    }
+
+    // First-time probe: try production
+    if (!_productionProbed) {
+      _productionProbed = true;
+      try {
+        debugPrint('📡 [API] Probing production: $_productionUrl$apiPath');
+        final res = await requestFn(_productionUrl).timeout(const Duration(seconds: 5));
+        if (res.statusCode < 500) {
+          _cachedUrl = _productionUrl;
+          debugPrint('🌐 [API] Production reachable! Locking in $_productionUrl');
+          return res;
+        }
+      } catch (_) {
+        debugPrint('⚠️ [API] Production unreachable → using local backend');
+      }
+    }
+
+    return _tryLocal(requestFn, timeout: timeout);
+  }
+
+  /// Try local backend candidates. Caches the first working one.
+  static Future<http.Response> _tryLocal(
+    Future<http.Response> Function(String url) requestFn, {
+    Duration timeout = const Duration(seconds: 4),
+  }) async {
+    // If we have a cached local URL — use it directly
+    if (_cachedUrl != null && _cachedUrl != _productionUrl) {
+      try {
+        final res = await requestFn(_cachedUrl!).timeout(timeout);
+        return res;
+      } catch (_) {
+        _cachedUrl = null; // Reset if it failed
+      }
+    }
+    // Probe each candidate
     for (final candidate in _localCandidateUrls) {
       try {
-        debugPrint('🔄 [ApiService] Probing local fallback: $candidate');
-        final res = await requestFn(candidate).timeout(const Duration(seconds: 4));
-        _activeBaseUrl = candidate;
-        debugPrint('🎉 [ApiService] Local backend connected: $candidate (HTTP ${res.statusCode})');
+        debugPrint('🔄 [API] Probing local: $candidate');
+        final res = await requestFn(candidate).timeout(timeout);
+        _cachedUrl = candidate;
+        debugPrint('🎉 [API] Local backend locked: $candidate');
         return res;
       } catch (_) {}
     }
-
-    throw Exception('[ApiService] All endpoints failed. Check network and server.');
+    throw Exception('[ApiService] No backend reachable. Start local server or check network.');
   }
 
-  /// Preload core catalogs on app launch to verify connection & warm data cache
+  /// Prewarm core public catalog APIs on app launch
   static Future<void> prewarmAllCoreApis() async {
-    debugPrint('🚀 [ApiService] Pre-warming core APIs from $_productionUrl ...');
+    debugPrint('🚀 [ApiService] Prewarming from $baseUrl...');
     try {
       final results = await Future.wait([
         fetchDoctors(),
         fetchSpecialties(),
         fetchPlans(),
         fetchHospitals(),
-        fetchAppointments(userId: 'u1'),
       ], eagerError: false);
-      debugPrint('🌟 [ApiService] Prewarm done! '
-          '${(results[0] as List).length} doctors, '
-          '${(results[1] as List).length} specialties, '
-          '${(results[2] as List).length} plans, '
-          '${(results[3] as List).length} hospitals loaded.');
+      debugPrint('🌟 [ApiService] Ready! ${(results[0] as List).length} doctors, '
+          '${(results[1] as List).length} specialties, ${(results[2] as List).length} plans. '
+          'Active backend: $baseUrl');
     } catch (e) {
       debugPrint('⚠️ [ApiService] Prewarm error: $e');
     }
@@ -95,15 +145,18 @@ class ApiService {
     required String role,
   }) async {
     try {
-      final res = await _safeRequest((url) => http.post(
-        Uri.parse('$url/auth/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'emailOrPhone': emailOrPhone,
-          'password': password,
-          'role': role,
-        }),
-      ));
+      final res = await _safeRequest(
+        (url) => http.post(
+          Uri.parse('$url/auth/login'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'emailOrPhone': emailOrPhone,
+            'password': password,
+            'role': role,
+          }),
+        ),
+        apiPath: '/auth/login',
+      );
       final data = jsonDecode(res.body);
       return data;
     } catch (e) {
@@ -256,7 +309,10 @@ class ApiService {
   /// Check verification status of doctor
   static Future<Map<String, dynamic>> getDoctorStatus(String doctorId) async {
     try {
-      final res = await _safeRequest((url) => http.get(Uri.parse('$url/auth/doctor-status/$doctorId')));
+      final res = await _safeRequest(
+        (url) => http.get(Uri.parse('$url/auth/doctor-status/$doctorId')),
+        apiPath: '/auth/doctor-status',
+      );
       if (res.statusCode == 200) {
         return jsonDecode(res.body);
       }
@@ -273,7 +329,10 @@ class ApiService {
   /// Fetch User Profile
   static Future<UserModel?> getUserProfile(String userId) async {
     try {
-      final res = await _safeRequest((url) => http.get(Uri.parse('$url/users/$userId')));
+      final res = await _safeRequest(
+        (url) => http.get(Uri.parse('$url/users/$userId')),
+        apiPath: '/users/',
+      );
       if (res.statusCode == 200) {
         final json = jsonDecode(res.body);
         if (json['success'] == true && json['data'] != null) {
@@ -457,7 +516,10 @@ class ApiService {
   /// Fetch active user subscription
   static Future<Map<String, dynamic>?> getUserSubscription(String userId) async {
     try {
-      final res = await _safeRequest((url) => http.get(Uri.parse('$url/subscriptions/$userId')));
+      final res = await _safeRequest(
+        (url) => http.get(Uri.parse('$url/subscriptions/$userId')),
+        apiPath: '/subscriptions',
+      );
       if (res.statusCode == 200) {
         final json = jsonDecode(res.body);
         return json['data'];
@@ -490,7 +552,10 @@ class ApiService {
   /// Fetch Wallet details & transactions
   static Future<WalletAccount?> getWallet(String userId) async {
     try {
-      final res = await _safeRequest((url) => http.get(Uri.parse('$url/wallet/$userId')));
+      final res = await _safeRequest(
+        (url) => http.get(Uri.parse('$url/wallet/$userId')),
+        apiPath: '/wallet/',
+      );
       if (res.statusCode == 200) {
         final json = jsonDecode(res.body);
         if (json['success'] == true && json['data'] != null) {
@@ -632,7 +697,10 @@ class ApiService {
       if (userId != null) query = '?userId=$userId';
       if (doctorId != null) query = '?doctorId=$doctorId';
 
-      final res = await _safeRequest((url) => http.get(Uri.parse('$url/appointments$query')));
+      final res = await _safeRequest(
+        (url) => http.get(Uri.parse('$url/appointments$query')),
+        apiPath: '/appointments',
+      );
       if (res.statusCode == 200) {
         final json = jsonDecode(res.body);
         if (json['success'] == true && json['data'] != null) {
@@ -683,7 +751,10 @@ class ApiService {
       if (consultationId != null) params.add('consultationId=$consultationId');
       final q = params.isNotEmpty ? '?${params.join('&')}' : '';
 
-      final res = await _safeRequest((url) => http.get(Uri.parse('$url/prescriptions$q')));
+      final res = await _safeRequest(
+        (url) => http.get(Uri.parse('$url/prescriptions$q')),
+        apiPath: '/prescriptions',
+      );
       if (res.statusCode == 200) {
         final json = jsonDecode(res.body);
         if (json['success'] == true && json['data'] != null) {
