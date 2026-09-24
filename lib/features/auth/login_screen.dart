@@ -35,8 +35,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!mounted) return;
     setState(() => _isLoading = false);
 
+    final bool isSuccess = res['success'] == true || res['status'] == 200;
+
+    if (!isSuccess) {
+      final errorMsg = res['message'] ?? 'Login failed. Please check your credentials.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  errorMsg,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFFDC2626),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
     if (_selectedRole == UserRole.doctor) {
-      if (res['status'] == 'pending' || res['success'] == false) {
+      if (res['status'] == 'pending' || res['status'] == 403) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(

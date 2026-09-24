@@ -13,6 +13,7 @@ import '../models/prescription_model.dart';
 import '../models/user_model.dart';
 
 class ApiService {
+
 /// Single production API base URL.
 /// Every API request in this service must use this URL.
 static const String baseUrl = 'https://www.drconnects24.com/api';
