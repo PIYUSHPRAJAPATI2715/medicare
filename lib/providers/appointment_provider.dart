@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/appointment_model.dart';
 import '../../models/doctor_model.dart';
 import '../../data/mock/mock_data.dart';
+import '../services/api_service.dart';
 
 class BookingDraft {
   final DoctorModel? doctor;
@@ -163,8 +164,10 @@ class AppointmentNotifier extends Notifier<AppointmentState> {
   AppointmentModel confirmBooking() {
     final d = state.draft;
     final doctor = d.doctor ?? MockData.doctors[0];
+    final aptId = 'apt_${DateTime.now().millisecondsSinceEpoch}';
+
     final newAppointment = AppointmentModel(
-      id: 'apt_${DateTime.now().millisecondsSinceEpoch}',
+      id: aptId,
       doctor: doctor,
       patientName: 'Piyush Prajapati',
       type: d.type,
@@ -174,7 +177,7 @@ class AppointmentNotifier extends Notifier<AppointmentState> {
       fee: d.totalAmount,
       preferredLanguage: d.selectedLanguage,
       clinicName: d.type == ConsultationType.inPerson ? doctor.clinicName : null,
-      meetingLink: d.type == ConsultationType.video ? 'https://medicare.plus/meet/${DateTime.now().millisecondsSinceEpoch}' : null,
+      meetingLink: d.type == ConsultationType.video ? 'https://medicare.plus/meet/$aptId' : null,
     );
 
     final updated = [newAppointment, ...state.appointments];
@@ -182,6 +185,19 @@ class AppointmentNotifier extends Notifier<AppointmentState> {
       appointments: updated,
       lastConfirmedAppointment: newAppointment,
     );
+
+    // Call backend API to record appointment dynamically
+    ApiService.bookAppointment({
+      'userId': 'u1',
+      'doctorId': doctor.id,
+      'type': d.type == ConsultationType.inPerson ? 'inPerson' : 'video',
+      'date': d.selectedDate.toIso8601String(),
+      'timeSlot': d.selectedSlot,
+      'fee': doctor.consultationFee,
+      'selectedLanguage': d.selectedLanguage,
+      'clinicName': doctor.clinicName,
+    });
+
     return newAppointment;
   }
 

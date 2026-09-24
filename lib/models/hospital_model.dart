@@ -22,4 +22,36 @@ class HospitalModel {
     required this.timing,
     required this.phone,
   });
+
+  factory HospitalModel.fromJson(Map<String, dynamic> json) {
+    return HospitalModel(
+      id: json['id']?.toString() ?? 'h1',
+      name: json['name']?.toString() ?? 'Hospital',
+      address: json['address']?.toString() ?? 'Jaipur',
+      rating: (json['rating'] as num?)?.toDouble() ?? 4.5,
+      reviewsCount: (json['reviewsCount'] as num?)?.toInt() ?? 100,
+      distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 2.5,
+      imageUrl: json['imageUrl']?.toString() ?? 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=600',
+      specialties: (json['facilities'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
+                   (json['specialties'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
+                   ['Emergency Care', 'Pharmacy'],
+      timing: json['timing']?.toString() ?? '24/7 Open',
+      phone: json['phone']?.toString() ?? '+91 141 275 1871',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'address': address,
+      'rating': rating,
+      'reviewsCount': reviewsCount,
+      'distanceKm': distanceKm,
+      'imageUrl': imageUrl,
+      'specialties': specialties,
+      'timing': timing,
+      'phone': phone,
+    };
+  }
 }

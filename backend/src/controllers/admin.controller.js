@@ -399,3 +399,576 @@ exports.deleteCoupon = (req, res) => {
   db.coupons = db.coupons.filter(c => c.code.toUpperCase() !== code.toUpperCase());
   res.json({ success: true, message: 'Coupon deleted successfully' });
 };
+
+// --- AUTHENTICATION (PATIENT, DOCTOR, ADMIN) ---
+exports.authLogin = (req, res) => {
+  const { emailOrPhone, password, role } = req.body;
+  const identifier = (emailOrPhone || '').trim().toLowerCase().replace(/[\s\-\(\)]/g, '');
+
+  if (role === 'doctor') {
+    // Find doctor by phone, email, or id
+    const doc = db.doctors.find(d => {
+      const p = (d.phone || '').replace(/[\s\-\(\)]/g, '');
+      const altP = (d.altPhone || '').replace(/[\s\-\(\)]/g, '');
+      const e = (d.email || '').toLowerCase();
+      return p.includes(identifier) || altP.includes(identifier) || e === identifier || d.id === identifier;
+    }) || db.doctors[0]; // Fallback to first doctor if demo match
+
+    // Check verification status
+    if (doc.verificationStatus === 'pending' || !doc.isVerified) {
+      return res.status(403).json({
+        success: false,
+        status: 'pending',
+        message: 'Your doctor profile is under verification. Credential review in progress.',
+        data: { doctor: doc },
+      });
+    }
+
+    if (doc.verificationStatus === 'rejected') {
+      return res.status(403).json({
+        success: false,
+        status: 'rejected',
+        message: `Doctor verification rejected: ${doc.rejectionNotes || 'Documentation verification failed.'}`,
+        data: { doctor: doc },
+      });
+    }
+
+    const matchedUser = db.users.find(u => u.doctorId === doc.id) || {
+      id: `u_${doc.id}`,
+      name: doc.name,
+      email: doc.email || `${doc.id}@medicare.com`,
+      phone: doc.phone || '+91 98290 11223',
+      role: 'doctor',
+      doctorId: doc.id,
+      status: 'active',
+      avatarUrl: doc.imageUrl,
+    };
+
+    return res.json({
+      success: true,
+      message: 'Doctor login successful',
+      token: `medicare_jwt_${doc.id}`,
+      data: { user: matchedUser, doctor: doc },
+    });
+  }
+
+  // Patient Login
+  const user = db.users.find(u => {
+    const p = (u.phone || '').replace(/[\s\-\(\)]/g, '');
+    const e = (u.email || '').toLowerCase();
+    return p.includes(identifier) || e === identifier;
+  }) || db.users[0]; // Fallback to default patient for smooth dev/demo
+
+  return res.json({
+    success: true,
+    message: 'Patient login successful',
+    token: `medicare_jwt_${user.id}`,
+    data: { user },
+  });
+};
+
+exports.registerPatient = (req, res) => {
+  const { name, email, phone, gender, dob, currentCity, password } = req.body;
+  const userId = `u${Date.now()}`;
+
+  const newUser = {
+    id: userId,
+    name: name || 'New Patient',
+    email: email || `user_${Date.now()}@example.com`,
+    phone: phone || '+91 90000 00000',
+    gender: gender || 'Male',
+    dob: dob || '1995-08-15',
+    role: 'patient',
+    status: 'active',
+    createdAt: new Date().toISOString(),
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+    currentCity: currentCity || 'Jaipur',
+  };
+
+  db.users.push(newUser);
+
+  // Initialize wallet for new user with ₹200 welcome credits
+  db.wallets[userId] = {
+    userId: userId,
+    balance: 200.0,
+    totalCashbackEarned: 20.0,
+    transactions: [
+      {
+        id: `tx_${Date.now()}`,
+        title: 'Welcome Bonus Credited',
+        description: 'Free ₹200 HealthPay credits for joining MediCare+',
+        amount: 200.0,
+        isCredit: true,
+        category: 'cashback',
+        timestamp: new Date().toISOString(),
+        referenceId: 'WELCOME-BONUS',
+        status: 'completed',
+      },
+    ],
+  };
+
+  res.json({
+    success: true,
+    message: 'Patient registered successfully! Welcome bonus credited to HealthPay.',
+    data: { user: newUser, wallet: db.wallets[userId] },
+  });
+};
+
+exports.getDoctorStatus = (req, res) => {
+  const { id } = req.params;
+  const doc = db.doctors.find(d => d.id === id || d.medicalLicenseNo === id);
+  if (!doc) {
+    return res.status(404).json({ success: false, message: 'Doctor not found' });
+  }
+  res.json({
+    success: true,
+    data: {
+      doctorId: doc.id,
+      name: doc.name,
+      status: doc.verificationStatus || (doc.isVerified ? 'approved' : 'pending'),
+      isVerified: !!doc.isVerified,
+      rejectionNotes: doc.rejectionNotes,
+      doctor: doc,
+    },
+  });
+};
+
+exports.getDoctorById = (req, res) => {
+  const { id } = req.params;
+  const doc = db.doctors.find(d => d.id === id);
+  if (!doc) return res.status(404).json({ success: false, message: 'Doctor not found' });
+  res.json({ success: true, data: doc });
+};
+
+// --- USER PROFILE & DELETE ACCOUNT ---
+exports.getUserProfile = (req, res) => {
+  const { id } = req.params;
+  const user = db.users.find(u => u.id === id);
+  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+  let doctor = null;
+  if (user.doctorId) {
+    doctor = db.doctors.find(d => d.id === user.doctorId);
+  }
+
+  const wallet = db.wallets[id] || { userId: id, balance: 0, transactions: [] };
+
+  res.json({
+    success: true,
+    data: { user, doctor, wallet },
+  });
+};
+
+// Override deleteUser to perform complete cleanup
+exports.deleteUser = (req, res) => {
+  const { id } = req.params;
+  const user = db.users.find(u => u.id === id);
+
+  if (user && user.doctorId) {
+    db.doctors = db.doctors.filter(d => d.id !== user.doctorId);
+  }
+
+  db.users = db.users.filter(u => u.id !== id);
+  delete db.wallets[id];
+  db.appointments = db.appointments.filter(a => a.userId !== id);
+  db.subscriptions = db.subscriptions.filter(s => s.userId !== id);
+
+  res.json({ success: true, message: 'User account and all related records deleted permanently' });
+};
+
+// --- CARE PLANS & SUBSCRIPTIONS ---
+exports.getPlans = (req, res) => {
+  res.json({ success: true, count: db.plans.length, data: db.plans });
+};
+
+exports.createPlan = (req, res) => {
+  const newPlan = {
+    id: `plan_${Date.now()}`,
+    name: req.body.name || 'New Care Plan',
+    tagline: req.body.tagline || 'Healthcare benefits',
+    price: Number(req.body.price) || 299,
+    originalPrice: Number(req.body.originalPrice) || 599,
+    durationDays: Number(req.body.durationDays) || 30,
+    durationLabel: req.body.durationLabel || '1 Month',
+    consultationLimit: Number(req.body.consultationLimit) || 3,
+    isPopular: !!req.body.isPopular,
+    badgeText: req.body.badgeText || '',
+    isActive: true,
+    features: req.body.features || ['Unlimited Chat', 'Prescriptions Included'],
+  };
+  db.plans.push(newPlan);
+  res.json({ success: true, message: 'Care Plan created successfully', data: newPlan });
+};
+
+exports.updatePlan = (req, res) => {
+  const { id } = req.params;
+  const idx = db.plans.findIndex(p => p.id === id);
+  if (idx === -1) return res.status(404).json({ success: false, message: 'Plan not found' });
+  db.plans[idx] = { ...db.plans[idx], ...req.body };
+  res.json({ success: true, message: 'Care Plan updated successfully', data: db.plans[idx] });
+};
+
+exports.deletePlan = (req, res) => {
+  const { id } = req.params;
+  db.plans = db.plans.filter(p => p.id !== id);
+  res.json({ success: true, message: 'Care Plan deleted successfully' });
+};
+
+exports.getUserSubscription = (req, res) => {
+  const { userId } = req.params;
+  const sub = db.subscriptions.find(s => s.userId === userId && s.status === 'active');
+  res.json({ success: true, data: sub || null });
+};
+
+exports.purchaseSubscription = (req, res) => {
+  const { userId, planId, paymentMethod, amount } = req.body;
+  const plan = db.plans.find(p => p.id === planId) || db.plans[0];
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + (plan.durationDays * 24 * 60 * 60 * 1000));
+
+  const newSub = {
+    id: `sub_${Date.now()}`,
+    userId: userId || 'u1',
+    planId: plan.id,
+    planName: plan.name,
+    plan: plan,
+    amount: amount || plan.price,
+    paymentMethod: paymentMethod || 'wallet',
+    status: 'active',
+    remainingConsultations: plan.consultationLimit === -1 ? 9999 : plan.consultationLimit,
+    subscribedAt: now.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+  };
+
+  // Deactivate any existing active subscription for this user
+  db.subscriptions.forEach(s => {
+    if (s.userId === (userId || 'u1')) s.status = 'expired';
+  });
+
+  db.subscriptions.push(newSub);
+
+  // If paid by wallet, debit user wallet and give 5% cashback
+  if (paymentMethod === 'wallet' && db.wallets[userId || 'u1']) {
+    const w = db.wallets[userId || 'u1'];
+    const cost = Number(amount || plan.price);
+    w.balance = Math.max(0, w.balance - cost);
+
+    w.transactions.unshift({
+      id: `tx_${Date.now()}`,
+      title: `${plan.name} Purchased`,
+      description: 'Care Plan Subscription via HealthPay Wallet',
+      amount: cost,
+      isCredit: false,
+      category: 'subscription',
+      timestamp: now.toISOString(),
+      referenceId: newSub.id,
+      status: 'completed',
+    });
+
+    // 5% cashback
+    const cb = Math.round(cost * 0.05);
+    w.balance += cb;
+    w.totalCashbackEarned = (w.totalCashbackEarned || 0) + cb;
+    w.transactions.unshift({
+      id: `tx_${Date.now() + 1}`,
+      title: '5% Care Plan Cashback',
+      description: 'Instant HealthCash rewarded',
+      amount: cb,
+      isCredit: true,
+      category: 'cashback',
+      timestamp: new Date().toISOString(),
+      referenceId: `CB-${newSub.id}`,
+      status: 'completed',
+    });
+  }
+
+  // Update user hasActiveCarePlan
+  const uIdx = db.users.findIndex(u => u.id === (userId || 'u1'));
+  if (uIdx !== -1) {
+    db.users[uIdx].hasActiveCarePlan = true;
+  }
+
+  res.json({
+    success: true,
+    message: `${plan.name} activated successfully!`,
+    data: newSub,
+  });
+};
+
+exports.cancelSubscription = (req, res) => {
+  const { userId, subscriptionId } = req.body;
+  const sub = db.subscriptions.find(s => s.id === subscriptionId || s.userId === userId);
+  if (sub) {
+    sub.status = 'cancelled';
+  }
+  const uIdx = db.users.findIndex(u => u.id === userId);
+  if (uIdx !== -1) {
+    db.users[uIdx].hasActiveCarePlan = false;
+  }
+  res.json({ success: true, message: 'Subscription cancelled successfully' });
+};
+
+// --- WALLET & HEALTHPAY ---
+exports.getWallet = (req, res) => {
+  const { userId } = req.params;
+  if (!db.wallets[userId]) {
+    db.wallets[userId] = {
+      userId,
+      balance: 1000.0,
+      totalCashbackEarned: 150.0,
+      transactions: [
+        {
+          id: `tx_${Date.now()}`,
+          title: 'Opening Wallet Credits',
+          description: 'MediCare+ Welcome Balance',
+          amount: 1000.0,
+          isCredit: true,
+          category: 'topUp',
+          timestamp: new Date().toISOString(),
+          referenceId: 'INIT-TOPUP',
+          status: 'completed',
+        },
+      ],
+    };
+  }
+  res.json({ success: true, data: db.wallets[userId] });
+};
+
+exports.topupWallet = (req, res) => {
+  const { userId, amount, paymentMethod, referenceId } = req.body;
+  const numAmount = Number(amount);
+  if (isNaN(numAmount) || numAmount <= 0) {
+    return res.status(400).json({ success: false, message: 'Invalid top-up amount' });
+  }
+
+  const uId = userId || 'u1';
+  if (!db.wallets[uId]) {
+    db.wallets[uId] = { userId: uId, balance: 0.0, totalCashbackEarned: 0.0, transactions: [] };
+  }
+
+  const w = db.wallets[uId];
+  w.balance += numAmount;
+
+  const newTxn = {
+    id: `tx_${Date.now()}`,
+    title: `Wallet Loaded via ${paymentMethod || 'UPI'}`,
+    description: 'Direct top-up into MediCare HealthPay',
+    amount: numAmount,
+    isCredit: true,
+    category: 'topUp',
+    timestamp: new Date().toISOString(),
+    referenceId: referenceId || `PAY-${Date.now()}`,
+    status: 'completed',
+  };
+
+  w.transactions.unshift(newTxn);
+
+  res.json({
+    success: true,
+    message: `₹${numAmount} added to HealthPay wallet successfully!`,
+    data: w,
+  });
+};
+
+exports.payWithWallet = (req, res) => {
+  const { userId, amount, purpose, category, referenceId } = req.body;
+  const numAmount = Number(amount);
+  const uId = userId || 'u1';
+
+  if (!db.wallets[uId]) {
+    db.wallets[uId] = { userId: uId, balance: 500.0, totalCashbackEarned: 0.0, transactions: [] };
+  }
+
+  const w = db.wallets[uId];
+  if (w.balance < numAmount) {
+    return res.status(400).json({ success: false, message: 'Insufficient HealthPay wallet balance' });
+  }
+
+  w.balance -= numAmount;
+
+  const debitTxn = {
+    id: `tx_${Date.now()}`,
+    title: purpose || 'HealthPay Payment',
+    description: 'Paid via MediCare+ HealthPay Wallet',
+    amount: numAmount,
+    isCredit: false,
+    category: category || 'consultation',
+    timestamp: new Date().toISOString(),
+    referenceId: referenceId || `REF-${Date.now()}`,
+    status: 'completed',
+  };
+
+  // 5% cashback
+  const cb = Math.round(numAmount * 0.05);
+  w.balance += cb;
+  w.totalCashbackEarned = (w.totalCashbackEarned || 0) + cb;
+
+  const cashbackTxn = {
+    id: `tx_${Date.now() + 1}`,
+    title: '5% Instant Health Cashback',
+    description: `Rewarded for ${purpose || 'Payment'}`,
+    amount: cb,
+    isCredit: true,
+    category: 'cashback',
+    timestamp: new Date().toISOString(),
+    referenceId: `CB-${referenceId || Date.now()}`,
+    status: 'completed',
+  };
+
+  w.transactions.unshift(cashbackTxn);
+  w.transactions.unshift(debitTxn);
+
+  res.json({
+    success: true,
+    message: 'Payment completed successfully via HealthPay',
+    data: w,
+  });
+};
+
+// --- PAYMENTS & ORDERS ---
+exports.createPaymentOrder = (req, res) => {
+  const { userId, amount, purpose } = req.body;
+  const numAmount = Number(amount) || 499;
+  const orderId = `order_${Date.now()}`;
+
+  res.json({
+    success: true,
+    data: {
+      orderId,
+      amount: numAmount,
+      platformFee: db.settings.platformFee,
+      gst: Math.round(numAmount * (db.settings.gstPercentage / 100)),
+      totalAmount: numAmount + db.settings.platformFee + Math.round(numAmount * (db.settings.gstPercentage / 100)),
+      currency: 'INR',
+      purpose: purpose || 'Doctor Consultation',
+      userId: userId || 'u1',
+    },
+  });
+};
+
+exports.verifyPaymentSuccess = (req, res) => {
+  const { orderId, userId, amount, paymentId, paymentMethod, purpose } = req.body;
+  const uId = userId || 'u1';
+
+  if (db.wallets[uId]) {
+    db.wallets[uId].transactions.unshift({
+      id: `tx_${Date.now()}`,
+      title: purpose || 'Payment Confirmed',
+      description: `Payment via ${paymentMethod || 'Online'} (${paymentId || orderId})`,
+      amount: Number(amount) || 0,
+      isCredit: false,
+      category: 'consultation',
+      timestamp: new Date().toISOString(),
+      referenceId: paymentId || orderId,
+      status: 'completed',
+    });
+  }
+
+  res.json({
+    success: true,
+    message: 'Payment verified and transaction recorded successfully!',
+    data: {
+      orderId,
+      paymentId: paymentId || `pay_${Date.now()}`,
+      status: 'captured',
+      timestamp: new Date().toISOString(),
+    },
+  });
+};
+
+// --- DISEASES & SYMPTOMS ---
+exports.getDiseases = (req, res) => {
+  res.json({ success: true, count: db.diseases.length, data: db.diseases });
+};
+
+exports.createDisease = (req, res) => {
+  const newDis = {
+    id: `dis_${Date.now()}`,
+    name: req.body.name || 'New Health Condition',
+    specialty: req.body.specialty || 'General Physician',
+    symptomCount: req.body.symptomCount || '5 Symptoms',
+  };
+  db.diseases.push(newDis);
+  res.json({ success: true, message: 'Disease/Symptom condition added', data: newDis });
+};
+
+// --- PRESCRIPTIONS ---
+exports.getPrescriptions = (req, res) => {
+  const { userId, doctorId, consultationId } = req.query;
+  let list = db.prescriptions;
+
+  if (userId) list = list.filter(p => p.patientId === userId || !p.patientId);
+  if (doctorId) list = list.filter(p => p.doctorId === doctorId);
+  if (consultationId) list = list.filter(p => p.consultationId === consultationId);
+
+  res.json({ success: true, count: list.length, data: list });
+};
+
+exports.getPrescriptionById = (req, res) => {
+  const { id } = req.params;
+  const rx = db.prescriptions.find(p => p.id === id);
+  if (!rx) return res.status(404).json({ success: false, message: 'Prescription not found' });
+  res.json({ success: true, data: rx });
+};
+
+exports.createPrescription = (req, res) => {
+  const newRx = {
+    id: `rx_${Date.now()}`,
+    consultationId: req.body.consultationId || `apt-${Date.now()}`,
+    doctorId: req.body.doctorId || 'd1',
+    doctorName: req.body.doctorName || 'Dr. Specialist',
+    doctorSpecialty: req.body.doctorSpecialty || 'General Physician',
+    clinicName: req.body.clinicName || 'MediCare Clinic',
+    doctorRegistrationNumber: req.body.doctorRegistrationNumber || 'RMC/2012/88741',
+    patientId: req.body.patientId || 'u1',
+    patientName: req.body.patientName || 'Piyush Prajapati',
+    patientAgeGender: req.body.patientAgeGender || '30 / Male',
+    diagnosis: req.body.diagnosis || 'Clinical Diagnosis',
+    symptoms: req.body.symptoms || [],
+    vitals: req.body.vitals || { BP: '120/80', Temp: '98.6 F' },
+    clinicalNotes: req.body.clinicalNotes || '',
+    adviceNotes: req.body.adviceNotes || '',
+    medicines: req.body.medicines || [],
+    issuedAt: new Date().toISOString(),
+    status: 'issued',
+    pharmacyStatus: 'none',
+    fulfillmentType: 'none',
+    digitalSignatureToken: `NMC-SIG-${Date.now().toString().substring(7)}`,
+  };
+
+  db.prescriptions.unshift(newRx);
+
+  // Update appointment if matching
+  const apt = db.appointments.find(a => a.id === newRx.consultationId);
+  if (apt) {
+    apt.status = 'completed';
+    apt.prescription = newRx.clinicalNotes || 'Prescription issued';
+    apt.prescriptionId = newRx.id;
+  }
+
+  res.json({
+    success: true,
+    message: 'Digital prescription issued and digitally signed by doctor',
+    data: newRx,
+  });
+};
+
+exports.orderPharmacyPrescription = (req, res) => {
+  const { id } = req.params;
+  const { address, paymentMethod } = req.body;
+
+  const rx = db.prescriptions.find(p => p.id === id);
+  if (!rx) return res.status(404).json({ success: false, message: 'Prescription not found' });
+
+  rx.pharmacyStatus = 'placed';
+  rx.fulfillmentType = 'orderedOnline';
+  rx.deliveryAddress = address || 'Home Address, Jaipur';
+  rx.orderPlacedAt = new Date().toISOString();
+
+  res.json({
+    success: true,
+    message: 'Medicine order placed successfully! Doorstep delivery within 2 hours.',
+    data: rx,
+  });
+};

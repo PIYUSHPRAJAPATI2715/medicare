@@ -62,17 +62,23 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   void _handleSignup() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
 
     if (_role == UserRole.patient) {
-      ref.read(authProvider.notifier).loginAsPatient();
+      await ref.read(authProvider.notifier).registerPatient(
+        name: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Patient',
+        email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : 'patient@example.com',
+        phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : '+91 98765 43210',
+        password: _passwordController.text.trim().isNotEmpty ? _passwordController.text.trim() : 'password123',
+        gender: _selectedGender,
+        dob: _dobController.text.trim(),
+      );
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
       Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.mainShell, (route) => false);
     } else {
-      ref.read(authProvider.notifier).loginAsDoctor();
-      Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.doctorDashboard, (route) => false);
+      setState(() => _isLoading = false);
+      Navigator.of(context).pushReplacementNamed(AppRoutes.doctorRegister);
     }
   }
 

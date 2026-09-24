@@ -1,10 +1,29 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/wallet_model.dart';
+import '../services/api_service.dart';
+import 'auth_provider.dart';
 
 class WalletNotifier extends Notifier<WalletAccount> {
   @override
   WalletAccount build() {
+    _loadWalletFromApi();
     return _createInitialWallet();
+  }
+
+  Future<void> _loadWalletFromApi() async {
+    final user = ref.read(authProvider).user;
+    final w = await ApiService.getWallet(user.id);
+    if (w != null) {
+      state = w;
+    }
+  }
+
+  Future<void> refreshWallet() async {
+    final user = ref.read(authProvider).user;
+    final w = await ApiService.getWallet(user.id);
+    if (w != null) {
+      state = w;
+    }
   }
 
   static WalletAccount _createInitialWallet() {
@@ -23,7 +42,7 @@ class WalletNotifier extends Notifier<WalletAccount> {
       ),
       WalletTransaction(
         id: 'TXN-98201',
-        title: 'Dr. Vipin Sharma Consultation',
+        title: 'Dr. Rajesh Sharma Consultation',
         description: 'Teleconsultation payment',
         amount: 499.0,
         isCredit: false,
@@ -43,28 +62,6 @@ class WalletNotifier extends Notifier<WalletAccount> {
         referenceId: 'CB-98202',
         status: WalletTransactionStatus.completed,
       ),
-      WalletTransaction(
-        id: 'TXN-97914',
-        title: 'Augmentin & Dolo Rx Order',
-        description: 'Medicines Express Home Delivery',
-        amount: 380.0,
-        isCredit: false,
-        category: WalletTransactionCategory.pharmacy,
-        timestamp: now.subtract(const Duration(days: 4)),
-        referenceId: 'RX-97914',
-        status: WalletTransactionStatus.completed,
-      ),
-      WalletTransaction(
-        id: 'TXN-97500',
-        title: 'Wallet Loaded via NetBanking',
-        description: 'HDFC Bank NetBanking top-up',
-        amount: 500.0,
-        isCredit: true,
-        category: WalletTransactionCategory.topUp,
-        timestamp: now.subtract(const Duration(days: 6)),
-        referenceId: 'NB-97500',
-        status: WalletTransactionStatus.completed,
-      ),
     ];
 
     return WalletAccount(
@@ -76,10 +73,13 @@ class WalletNotifier extends Notifier<WalletAccount> {
   }
 
   /// Add money to wallet via UPI / Card / NetBanking
-  void addMoney(double amount, String paymentMethod) {
+  Future<void> addMoney(double amount, String paymentMethod) async {
     if (amount <= 0) return;
+    final user = ref.read(authProvider).user;
     final now = DateTime.now();
     final txnId = 'TXN-${now.millisecondsSinceEpoch.toString().substring(7)}';
+
+    // Local optimistic update
     final newTxn = WalletTransaction(
       id: txnId,
       title: 'Wallet Loaded via $paymentMethod',
@@ -96,6 +96,16 @@ class WalletNotifier extends Notifier<WalletAccount> {
       balance: state.balance + amount,
       transactions: [newTxn, ...state.transactions],
     );
+
+    // Dynamic backend sync
+    final remoteWallet = await ApiService.topupWallet(
+      userId: user.id,
+      amount: amount,
+      paymentMethod: paymentMethod,
+    );
+    if (remoteWallet != null) {
+      state = remoteWallet;
+    }
   }
 
   /// Spend wallet balance (for consultations, medicines, subscriptions)
@@ -109,9 +119,10 @@ class WalletNotifier extends Notifier<WalletAccount> {
       return false; // Insufficient funds
     }
 
+    final user = ref.read(authProvider).user;
     final now = DateTime.now();
     final txnId = 'TXN-${now.millisecondsSinceEpoch.toString().substring(7)}';
-    final ref = referenceId ?? 'REF-${now.millisecondsSinceEpoch.toString().substring(8)}';
+    final refId = referenceId ?? 'REF-${now.millisecondsSinceEpoch.toString().substring(8)}';
 
     final debitTxn = WalletTransaction(
       id: txnId,
@@ -121,7 +132,7 @@ class WalletNotifier extends Notifier<WalletAccount> {
       isCredit: false,
       category: category,
       timestamp: now,
-      referenceId: ref,
+      referenceId: refId,
       status: WalletTransactionStatus.completed,
     );
 
@@ -137,7 +148,7 @@ class WalletNotifier extends Notifier<WalletAccount> {
       isCredit: true,
       category: WalletTransactionCategory.cashback,
       timestamp: now.add(const Duration(seconds: 1)),
-      referenceId: 'CASHBACK-$ref',
+      referenceId: 'CASHBACK-$refId',
       status: WalletTransactionStatus.completed,
     );
 
@@ -146,6 +157,15 @@ class WalletNotifier extends Notifier<WalletAccount> {
       healthCashback: state.healthCashback + cashbackEarned,
       rewardPoints: state.rewardPoints + pointsEarned,
       transactions: [cashbackTxn, debitTxn, ...state.transactions],
+    );
+
+    // Sync to backend API
+    ApiService.payWithWallet(
+      userId: user.id,
+      amount: amount,
+      purpose: purpose,
+      category: category.name,
+      referenceId: refId,
     );
 
     return true;

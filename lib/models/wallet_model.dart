@@ -96,4 +96,27 @@ class WalletAccount {
       transactions: transactions ?? this.transactions,
     );
   }
+
+  factory WalletAccount.fromJson(Map<String, dynamic> json) {
+    return WalletAccount(
+      balance: (json['balance'] as num?)?.toDouble() ?? 0.0,
+      healthCashback: (json['totalCashbackEarned'] as num?)?.toDouble() ??
+          (json['healthCashback'] as num?)?.toDouble() ??
+          0.0,
+      rewardPoints: (json['rewardPoints'] as num?)?.toInt() ?? 200,
+      transactions: (json['transactions'] as List<dynamic>?)
+              ?.map((t) => WalletTransaction.fromJson(t as Map<String, dynamic>))
+              .toList() ??
+          [],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'balance': balance,
+      'healthCashback': healthCashback,
+      'rewardPoints': rewardPoints,
+      'transactions': transactions.map((t) => t.toJson()).toList(),
+    };
+  }
 }

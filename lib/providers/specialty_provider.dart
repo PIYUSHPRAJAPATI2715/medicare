@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/specialty_model.dart';
+import '../../models/disease_model.dart';
 import '../../data/mock/mock_data.dart';
 import '../services/api_service.dart';
 
@@ -16,6 +17,10 @@ final allSpecialtiesProvider = FutureProvider<List<SpecialtyModel>>((ref) async 
   return await ApiService.fetchSpecialties();
 });
 
+final allDiseasesProvider = FutureProvider<List<DiseaseModel>>((ref) async {
+  return await ApiService.fetchDiseases();
+});
+
 final specialtiesListProvider = Provider<List<SpecialtyModel>>((ref) {
   final query = ref.watch(specialtySearchQueryProvider).toLowerCase().trim();
   final asyncSpecialties = ref.watch(allSpecialtiesProvider);
@@ -29,4 +34,5 @@ final specialtiesListProvider = Provider<List<SpecialtyModel>>((ref) {
     return matchName || matchDesc || matchSymptom;
   }).toList();
 });
+
 

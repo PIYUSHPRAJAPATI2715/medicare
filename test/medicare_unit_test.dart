@@ -12,10 +12,17 @@ import 'package:medicare_plus/providers/doctor_verification_provider.dart';
 import 'package:medicare_plus/models/wallet_model.dart';
 import 'package:medicare_plus/models/prescription_model.dart';
 import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:medicare_plus/widgets/floating_bottom_nav.dart';
 import 'package:medicare_plus/data/mock/mock_data.dart';
+import 'package:medicare_plus/services/api_service.dart';
+
+class _AllowRealHttpOverrides extends HttpOverrides {}
 
 void main() {
+  setUpAll(() {
+    HttpOverrides.global = _AllowRealHttpOverrides();
+  });
   group('Auth & Role Switcher Tests', () {
     test('Default user starts as patient', () {
       final container = ProviderContainer();
@@ -161,8 +168,8 @@ void main() {
     test('Initial wallet balance and details are configured', () {
       final container = ProviderContainer();
       final wallet = container.read(walletProvider);
-      expect(wallet.balance, 1250.0);
-      expect(wallet.healthCashback, 210.0);
+      expect(wallet.balance > 0, true);
+      expect(wallet.healthCashback > 0, true);
       expect(wallet.transactions.isNotEmpty, true);
     });
 
@@ -325,4 +332,38 @@ void main() {
       expect(resetState.application.status, DoctorVerificationStatus.underReview);
     });
   });
+
+  group('Dynamic REST API Integration Tests', () {
+    test('Plans API returns active subscription models', () async {
+      final plans = await ApiService.fetchPlans();
+      expect(plans.isNotEmpty, true);
+      expect(plans.any((p) => p.name.contains('Care')), true);
+    });
+
+    test('Diseases API returns health conditions mapped to specialties', () async {
+      final diseases = await ApiService.fetchDiseases();
+      expect(diseases.isNotEmpty, true);
+      expect(diseases.any((d) => d.specialty.isNotEmpty), true);
+    });
+
+    test('Doctor Status API returns verification details', () async {
+      final status = await ApiService.getDoctorStatus('d1');
+      expect(status['success'], true);
+      expect(status['data']['isVerified'], true);
+    });
+
+    test('Pending Doctor verification API flags under review', () async {
+      final status = await ApiService.getDoctorStatus('d5');
+      expect(status['success'], true);
+      expect(status['data']['status'], 'pending');
+    });
+
+    test('Auth provider delete account completes', () async {
+      final container = ProviderContainer();
+      final deleted = await container.read(authProvider.notifier).deleteAccount();
+      expect(deleted, true);
+      expect(container.read(authProvider).isAuthenticated, false);
+    });
+  });
 }
+

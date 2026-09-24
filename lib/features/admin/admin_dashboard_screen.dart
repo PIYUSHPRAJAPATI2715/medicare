@@ -6,6 +6,7 @@ import '../../models/user_model.dart';
 import '../../models/doctor_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../data/mock/mock_data.dart';
+import '../../services/api_service.dart';
 import '../../widgets/custom_app_bar.dart';
 
 class AdminDashboardScreen extends ConsumerStatefulWidget {
@@ -22,6 +23,14 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   void initState() {
     super.initState();
     _doctors = List.from(MockData.doctors);
+    _loadDoctors();
+  }
+
+  Future<void> _loadDoctors() async {
+    final list = await ApiService.fetchDoctors(all: true);
+    if (mounted && list.isNotEmpty) {
+      setState(() => _doctors = list);
+    }
   }
 
   void _confirmDeleteDoctor(DoctorModel doc) {
@@ -70,17 +79,20 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
               setState(() {
                 _doctors.removeWhere((d) => d.id == doc.id);
               });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${doc.name} was deleted successfully.'),
-                  backgroundColor: const Color(0xFFDC2626),
-                ),
-              );
+              await ApiService.deleteDoctor(doc.id);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${doc.name} was deleted successfully from MediCare+ database.'),
+                    backgroundColor: const Color(0xFFDC2626),
+                  ),
+                );
+              }
             },
             child: const Text('Delete Doctor',
                 style: TextStyle(

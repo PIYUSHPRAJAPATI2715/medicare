@@ -18,8 +18,11 @@ class InPersonScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
-    final recommendedDoctors = MockData.doctors.where((d) => d.allowsPhysical).toList();
-    final hospitals = MockData.hospitals;
+    final asyncDoctors = ref.watch(allDoctorsProvider);
+    final allDocs = asyncDoctors.value ?? MockData.doctors;
+    final recommendedDoctors = allDocs.where((d) => d.allowsPhysical).toList();
+    final asyncHospitals = ref.watch(allHospitalsProvider);
+    final hospitals = asyncHospitals.value ?? MockData.hospitals;
 
     return Scaffold(
       backgroundColor: AppColors.background,

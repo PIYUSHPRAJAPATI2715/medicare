@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/doctor_model.dart';
+import '../../models/hospital_model.dart';
 import '../../data/mock/mock_data.dart';
 import '../services/api_service.dart';
 
@@ -181,4 +182,10 @@ final doctorByIdProvider = Provider.family<DoctorModel?, String>((ref, id) {
     return null;
   }
 });
+
+// Dynamic Hospitals Provider via ApiService
+final allHospitalsProvider = FutureProvider<List<HospitalModel>>((ref) async {
+  return await ApiService.fetchHospitals();
+});
+
 

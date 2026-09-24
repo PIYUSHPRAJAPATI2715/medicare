@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/subscription_plan_model.dart';
+import '../services/api_service.dart';
 import 'auth_provider.dart';
+import 'wallet_provider.dart';
 
 class SubscriptionState {
   final List<SubscriptionPlanModel> availablePlans;
@@ -115,18 +117,29 @@ class SubscriptionNotifier extends Notifier<SubscriptionState> {
 
   @override
   SubscriptionState build() {
+    // Asynchronously load real plans from backend
+    _loadPlansFromApi();
+
     return const SubscriptionState(
       availablePlans: defaultAdminPlans,
-      activePlan: null, // Unsubscribed by default as requested
+      activePlan: null,
       remainingConsultations: 0,
     );
   }
 
-  /// Activate a subscription plan for the patient
-  void activatePlan(SubscriptionPlanModel plan) {
+  Future<void> _loadPlansFromApi() async {
+    final plans = await ApiService.fetchPlans();
+    if (plans.isNotEmpty) {
+      state = state.copyWith(availablePlans: plans);
+    }
+  }
+
+  /// Activate a subscription plan for the patient dynamically
+  Future<void> activatePlan(SubscriptionPlanModel plan, {String paymentMethod = 'wallet'}) async {
     final now = DateTime.now();
     final expiry = now.add(Duration(days: plan.durationDays));
-    
+    final currentUser = ref.read(authProvider).user;
+
     state = state.copyWith(
       activePlan: plan,
       subscribedAt: now,
@@ -134,9 +147,19 @@ class SubscriptionNotifier extends Notifier<SubscriptionState> {
       remainingConsultations: plan.isUnlimited ? 9999 : plan.consultationLimit,
     );
 
-    // Also sync with AuthState so UserModel hasActiveCarePlan becomes true
+    // Call backend API to record subscription and wallet transaction
+    await ApiService.purchaseSubscription(
+      userId: currentUser.id,
+      planId: plan.id,
+      paymentMethod: paymentMethod,
+      amount: plan.price,
+    );
+
+    // Refresh wallet so user sees updated balance & cashback
+    ref.read(walletProvider.notifier).refreshWallet();
+
+    // Sync AuthState
     final authNotifier = ref.read(authProvider.notifier);
-    final currentUser = ref.read(authProvider).user;
     authNotifier.updateProfile(
       name: currentUser.name,
       phone: currentUser.phone,
@@ -161,6 +184,10 @@ class SubscriptionNotifier extends Notifier<SubscriptionState> {
 
   /// Cancel current plan
   void cancelSubscription() {
+    final currentUser = ref.read(authProvider).user;
+    if (state.activePlan != null) {
+      ApiService.cancelSubscription(currentUser.id, state.activePlan!.id);
+    }
     state = state.copyWith(clearActivePlan: true);
   }
 }

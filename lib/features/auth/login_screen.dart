@@ -25,42 +25,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   void _handleLogin() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
+
+    final res = await ref.read(authProvider.notifier).login(
+      emailOrPhone: _phoneOrEmailController.text.trim(),
+      password: _passwordController.text.trim(),
+      role: _selectedRole,
+    );
 
     if (!mounted) return;
     setState(() => _isLoading = false);
 
-    if (_selectedRole == UserRole.patient) {
-      ref.read(authProvider.notifier).loginAsPatient();
-      Navigator.of(context).pushReplacementNamed(AppRoutes.mainShell);
-    } else {
-      // Doctor login verification check
-      final verificationState = ref.read(doctorVerificationProvider);
-      if (verificationState.isUnderReview) {
+    if (_selectedRole == UserRole.doctor) {
+      if (res['status'] == 'pending' || res['success'] == false) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Row(
               children: [
-                Icon(Icons.hourglass_top_rounded, color: Colors.white, size: 18),
-                SizedBox(width: 10),
+                const Icon(Icons.hourglass_top_rounded, color: Colors.white, size: 18),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Your doctor profile is under verification. Credential review in progress.',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                    res['message'] ?? 'Your doctor profile is under verification. Credential review in progress.',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
             ),
-            backgroundColor: Color(0xFFD97706),
-            duration: Duration(seconds: 4),
+            backgroundColor: const Color(0xFFD97706),
+            duration: const Duration(seconds: 4),
           ),
         );
         Navigator.of(context).pushNamed(AppRoutes.doctorVerificationStatus);
         return;
       }
 
-      ref.read(authProvider.notifier).loginAsDoctor();
       Navigator.of(context).pushReplacementNamed(AppRoutes.doctorDashboard);
+    } else {
+      Navigator.of(context).pushReplacementNamed(AppRoutes.mainShell);
     }
   }
 

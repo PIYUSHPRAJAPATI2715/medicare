@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/doctor_model.dart';
 import '../models/prescription_model.dart';
+import '../services/api_service.dart';
 import 'auth_provider.dart';
 
 class PrescriptionState {
@@ -252,6 +253,32 @@ class PrescriptionNotifier extends Notifier<PrescriptionState> {
       lastNotificationMessage: '🔔 ${doctor.name} has issued your official digital prescription!',
     );
 
+    // Call backend API to record prescription dynamically
+    ApiService.createPrescription({
+      'id': rxId,
+      'consultationId': newRx.consultationId,
+      'doctorId': doctor.id,
+      'doctorName': doctor.name,
+      'doctorSpecialty': doctor.specialty,
+      'patientId': patient.id,
+      'patientName': patient.name,
+      'diagnosis': diagnosis,
+      'clinicalNotes': clinicalNotes,
+      'adviceNotes': adviceNotes,
+      'medicines': medicines.map((m) => {
+        'id': m.id,
+        'name': m.name,
+        'genericName': m.genericName,
+        'dosage': m.dosage,
+        'frequency': m.frequency,
+        'instructions': m.instructions,
+        'durationDays': m.durationDays,
+        'quantity': m.quantity,
+        'unit': m.unit,
+        'unitPrice': m.unitPrice,
+      }).toList(),
+    });
+
     return newRx;
   }
 
@@ -377,6 +404,9 @@ class PrescriptionNotifier extends Notifier<PrescriptionState> {
       prescriptions: updatedList,
       latestPrescription: updatedLatest,
     );
+
+    // Call backend API to record pharmacy order
+    ApiService.orderPrescriptionPharmacy(prescriptionId, address: address);
   }
 
   /// Mark prescription as user buying themselves

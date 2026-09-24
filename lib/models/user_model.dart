@@ -71,4 +71,51 @@ class UserModel {
       isDoctorAvailable: isDoctorAvailable ?? this.isDoctorAvailable,
     );
   }
+
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    UserRole parsedRole = UserRole.patient;
+    final r = json['role']?.toString().toLowerCase();
+    if (r == 'doctor') {
+      parsedRole = UserRole.doctor;
+    } else if (r == 'admin') {
+      parsedRole = UserRole.admin;
+    }
+
+    return UserModel(
+      id: json['id']?.toString() ?? 'u1',
+      name: json['name']?.toString() ?? 'User',
+      email: json['email']?.toString() ?? '',
+      phone: json['phone']?.toString() ?? '',
+      role: parsedRole,
+      avatarUrl: json['avatarUrl']?.toString() ??
+          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+      gender: json['gender']?.toString() ?? 'Male',
+      dob: json['dob']?.toString() ?? '15 Aug 1994',
+      hasActiveCarePlan: json['hasActiveCarePlan'] == true,
+      specialization: json['specialization']?.toString() ?? json['specialty']?.toString(),
+      experienceYears: json['experienceYears'] is num ? (json['experienceYears'] as num).toInt() : null,
+      clinicName: json['clinicName']?.toString(),
+      registrationNumber: json['registrationNumber']?.toString() ?? json['medicalLicenseNo']?.toString(),
+      isDoctorAvailable: json['isDoctorAvailable'] ?? true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+      'phone': phone,
+      'role': role.name,
+      'avatarUrl': avatarUrl,
+      'gender': gender,
+      'dob': dob,
+      'hasActiveCarePlan': hasActiveCarePlan,
+      'specialization': specialization,
+      'experienceYears': experienceYears,
+      'clinicName': clinicName,
+      'registrationNumber': registrationNumber,
+      'isDoctorAvailable': isDoctorAvailable,
+    };
+  }
 }

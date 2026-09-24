@@ -530,7 +530,7 @@ class AccountScreen extends ConsumerWidget {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.error),
+                    border: Border.all(color: AppColors.error.withValues(alpha: 0.5)),
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -539,6 +539,73 @@ class AccountScreen extends ConsumerWidget {
                       SizedBox(width: 8),
                       Text('Logout', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w800, fontSize: 14)),
                     ],
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Delete Account Button (API connected)
+            StaggeredFadeSlide(
+              index: 8,
+              child: Center(
+                child: TextButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        title: const Row(
+                          children: [
+                            Icon(Icons.warning_amber_rounded, color: AppColors.error),
+                            SizedBox(width: 10),
+                            Text('Delete Account?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                          ],
+                        ),
+                        content: const Text(
+                          'Are you sure you want to permanently delete your account?\n\nThis will remove your medical profile, appointment history, and HealthPay wallet from MediCare+ servers. This action cannot be undone.',
+                          style: TextStyle(fontSize: 13.5, color: AppColors.textSecondary, height: 1.4),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.error,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            onPressed: () async {
+                              Navigator.pop(ctx);
+                              await ref.read(authProvider.notifier).deleteAccount();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Your account and all associated data have been deleted.'),
+                                    backgroundColor: Colors.black87,
+                                  ),
+                                );
+                                Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.login, (r) => false);
+                              }
+                            },
+                            child: const Text('Delete Permanently', style: TextStyle(fontWeight: FontWeight.w700)),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.delete_forever_rounded, color: AppColors.textTertiary, size: 18),
+                  label: const Text(
+                    'Delete Account Permanently',
+                    style: TextStyle(
+                      color: AppColors.textTertiary,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      decoration: TextDecoration.underline,
+                    ),
                   ),
                 ),
               ),

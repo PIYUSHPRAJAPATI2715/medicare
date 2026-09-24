@@ -5,6 +5,8 @@ import '../../core/routes/app_routes.dart';
 import '../../models/wallet_model.dart';
 import '../../providers/appointment_provider.dart';
 import '../../providers/wallet_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/api_service.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
 
@@ -23,11 +25,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final appointmentState = ref.read(appointmentProvider);
     final draft = appointmentState.draft;
     final doctor = draft.doctor;
+    final currentUser = ref.read(authProvider).user;
 
     setState(() => _isProcessing = true);
-    await Future.delayed(const Duration(milliseconds: 900));
-
-    if (!mounted) return;
 
     if (_selectedMethod == 'wallet') {
       final success = ref.read(walletProvider.notifier).payWithWallet(
@@ -43,8 +43,19 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         );
         return;
       }
+    } else {
+      // Record payment success in backend API
+      await ApiService.verifyPaymentSuccess(
+        orderId: 'ORD-${DateTime.now().millisecondsSinceEpoch}',
+        userId: currentUser.id,
+        amount: draft.totalAmount,
+        paymentId: 'PAY-${DateTime.now().millisecondsSinceEpoch}',
+        paymentMethod: _selectedMethod,
+        purpose: 'Consultation: ${doctor?.name ?? "Doctor"}',
+      );
     }
 
+    if (!mounted) return;
     setState(() => _isProcessing = false);
 
     ref.read(appointmentProvider.notifier).confirmBooking();
