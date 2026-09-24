@@ -20,11 +20,19 @@ subprojects {
 }
 
 subprojects {
+    plugins.withId("com.android.library") {
+        if (!plugins.hasPlugin("org.jetbrains.kotlin.android")) {
+            apply(plugin = "org.jetbrains.kotlin.android")
+        }
+    }
+}
+
+subprojects {
     if (project.name != "app") {
         afterEvaluate {
             val android = project.extensions.findByName("android")
             if (android is com.android.build.gradle.BaseExtension) {
-                android.compileSdkVersion(35)
+                android.compileSdkVersion(36)
             }
         }
     }

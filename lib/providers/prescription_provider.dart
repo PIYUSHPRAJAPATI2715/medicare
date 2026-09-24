@@ -186,6 +186,7 @@ class PrescriptionNotifier extends Notifier<PrescriptionState> {
     );
   }
 
+
   /// Mark consultation as ended with doctor currently writing the Rx
   void startConsultationPendingRx(DoctorModel doctor, {String? consultationId}) {
     final updated = Map<String, DoctorModel>.from(state.pendingDrafts);

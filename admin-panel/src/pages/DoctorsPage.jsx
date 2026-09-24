@@ -75,9 +75,10 @@ export default function DoctorsPage() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (confirm('Delete this doctor record?')) {
-      await apiService.deleteDoctor(id);
+  const handleDelete = async (id, name = 'doctor') => {
+    if (confirm(`Are you sure you want to delete ${name}? This will permanently remove the doctor profile and booking availability.`)) {
+      const res = await apiService.deleteDoctor(id);
+      setDoctors(prev => prev.filter(d => d.id !== id));
       loadDoctors();
     }
   };
@@ -181,16 +182,27 @@ export default function DoctorsPage() {
             </div>
 
             {/* Quick Admin Actions */}
-            <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-xs font-bold">
-              <button
-                onClick={() => handleToggleOnline(doc)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors ${
-                  doc.isOnline ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'
-                }`}
-              >
-                <CircleDot className={`w-3.5 h-3.5 ${doc.isOnline ? 'text-emerald-500 animate-pulse' : 'text-slate-400'}`} />
-                {doc.isOnline ? 'Online Now' : 'Offline'}
-              </button>
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs font-bold gap-2">
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => handleToggleOnline(doc)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors ${
+                    doc.isOnline ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'
+                  }`}
+                >
+                  <CircleDot className={`w-3.5 h-3.5 ${doc.isOnline ? 'text-emerald-500 animate-pulse' : 'text-slate-400'}`} />
+                  {doc.isOnline ? 'Online' : 'Offline'}
+                </button>
+
+                <button
+                  onClick={() => handleDelete(doc.id, doc.name)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 font-bold transition-colors"
+                  title="Delete Doctor"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+              </div>
 
               <button
                 onClick={() => setVerifyDoctorModal(doc)}
@@ -201,7 +213,7 @@ export default function DoctorsPage() {
                 }`}
               >
                 <FileCheck className="w-3.5 h-3.5" />
-                {doc.isVerified ? 'Verified Documentation' : 'Review & Verify License'}
+                {doc.isVerified ? 'Verified Docs' : 'Review & Verify License'}
               </button>
             </div>
           </div>
@@ -493,18 +505,31 @@ export default function DoctorsPage() {
             </div>
 
             {/* Modal Actions */}
-            <div className="flex gap-3 pt-3 border-t border-slate-100">
+            <div className="flex flex-wrap sm:flex-nowrap gap-3 pt-3 border-t border-slate-100">
               <button
+                type="button"
+                onClick={() => {
+                  handleDelete(verifyDoctorModal.id, verifyDoctorModal.name);
+                  setVerifyDoctorModal(null);
+                }}
+                className="py-3 px-4 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border border-red-200 transition-colors"
+                title="Permanently remove doctor"
+              >
+                <Trash2 className="w-4 h-4" /> Delete Doctor
+              </button>
+              <button
+                type="button"
                 onClick={() => handleRejectDoctor(verifyDoctorModal.id)}
-                className="flex-1 py-3 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border border-red-200 transition-colors"
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-200 transition-colors"
               >
                 <XCircle className="w-4 h-4" /> Reject Application
               </button>
               <button
+                type="button"
                 onClick={() => handleApproveDoctor(verifyDoctorModal.id)}
                 className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 transition-colors"
               >
-                <CheckCircle className="w-4 h-4" /> Approve & Grant Telemedicine License
+                <CheckCircle className="w-4 h-4" /> Approve & Grant License
               </button>
             </div>
           </div>
