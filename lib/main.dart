@@ -23,6 +23,7 @@ import 'features/account/care_plan_screen.dart';
 import 'features/account/notifications_screen.dart';
 import 'features/account/help_support_screen.dart';
 import 'features/auth/doctor_registration_screen.dart';
+import 'features/auth/doctor_verification_status_screen.dart';
 import 'features/doctor_dashboard/doctor_dashboard_screen.dart';
 import 'features/admin/admin_dashboard_screen.dart';
 import 'features/prescription/prescription_detail_screen.dart';
@@ -163,6 +164,8 @@ class MediCareApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const DoctorDashboardScreen());
           case AppRoutes.doctorRegister:
             return MaterialPageRoute(builder: (_) => const DoctorRegistrationScreen());
+          case AppRoutes.doctorVerificationStatus:
+            return MaterialPageRoute(builder: (_) => const DoctorVerificationStatusScreen());
           case AppRoutes.adminDashboard:
             return MaterialPageRoute(builder: (_) => const AdminDashboardScreen());
 

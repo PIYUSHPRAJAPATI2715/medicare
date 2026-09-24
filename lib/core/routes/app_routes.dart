@@ -44,6 +44,7 @@ class AppRoutes {
   // Doctor Portal
   static const String doctorDashboard = '/doctor-dashboard';
   static const String doctorRegister = '/doctor-register';
+  static const String doctorVerificationStatus = '/doctor-verification-status';
 
   // Admin Portal
   static const String adminDashboard = '/admin-dashboard';

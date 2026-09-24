@@ -66,5 +66,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>MediCare+ requires camera access to capture doctor degree certificates, council licenses, and official stamps.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>MediCare+ requires photo library access to upload medical qualification documents and council registration certificates.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>MediCare+ requires microphone access for telehealth audio and video consultations.</string>
 </dict>
 </plist>

@@ -8,7 +8,9 @@ import 'package:intl/intl.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/routes/app_routes.dart';
+import '../../core/utils/permission_helper.dart';
 import '../../providers/specialty_provider.dart';
+import '../../providers/doctor_verification_provider.dart';
 
 /// Representation of an actual uploaded document or photo
 class UploadedDoc {
@@ -278,6 +280,14 @@ class _DoctorRegistrationScreenState
   // REAL DOCUMENT & PHOTO PICKERS (CAMERA / GALLERY / FILES)
   // -------------------------------------------------------------
   Future<void> _pickImage(String docKey, ImageSource source) async {
+    if (source == ImageSource.camera) {
+      final hasPermission = await PermissionHelper.requestCameraPermission(context);
+      if (!hasPermission) return;
+    } else {
+      final hasPermission = await PermissionHelper.requestGalleryPermission(context);
+      if (!hasPermission) return;
+    }
+
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
@@ -317,6 +327,9 @@ class _DoctorRegistrationScreenState
   }
 
   Future<void> _pickFile(String docKey) async {
+    final hasPermission = await PermissionHelper.requestGalleryPermission(context);
+    if (!hasPermission) return;
+
     try {
       final files = await FilePicker.pickFiles(
         type: FileType.custom,
@@ -726,10 +739,26 @@ class _DoctorRegistrationScreenState
       if (!mounted) return;
 
       final randomDigits = (10000 + (DateTime.now().millisecondsSinceEpoch % 89999)).toString();
+      final regId = 'MED-DOC-$randomDigits';
+
+      ref.read(doctorVerificationProvider.notifier).submitApplication(
+        applicationId: regId,
+        fullName: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+        primaryDegree: _primaryDegree,
+        postGradDegree: _postGradDegree == 'None' ? null : _postGradDegree,
+        councilName: _stateCouncil,
+        licenseNumber: _licenseNoController.text.trim(),
+        specialization: _selectedSpecialty ?? 'General Physician',
+        clinicName: _clinicNameController.text.trim(),
+        uploadedDocsCount: _uploadedDocs.length,
+      );
+
       setState(() {
         _isSubmitting = false;
-        _generatedRegId = 'MED-DOC-$randomDigits';
-        _currentStep = 7; // Show success screen
+        _generatedRegId = regId;
+        _currentStep = 7; // Show verification status screen
       });
       _scrollToTop();
     }
@@ -1748,14 +1777,14 @@ class _DoctorRegistrationScreenState
   }
 
   // -------------------------------------------------------------
-  // STEP 8: SUBMISSION SUCCESS SCREEN
+  // STEP 8: SUBMISSION & VERIFICATION STATUS SCREEN
   // -------------------------------------------------------------
   Widget _buildSuccessScreen() {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -1765,17 +1794,17 @@ class _DoctorRegistrationScreenState
                 width: 76,
                 height: 76,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFDCFCE7),
+                  color: Color(0xFFFEF3C7),
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
-                  child: Icon(Icons.check_rounded, color: Color(0xFF16A34A), size: 42),
+                  child: Icon(Icons.hourglass_top_rounded, color: Color(0xFFD97706), size: 40),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               const Text(
-                'Application Submitted',
+                'Application Under Verification',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
@@ -1783,24 +1812,31 @@ class _DoctorRegistrationScreenState
                   letterSpacing: -0.4,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
 
-              Text(
-                'Reference ID: $_generatedRegId',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Application ID: $_generatedRegId',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFB45309),
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
 
               const Text(
-                'Your medical credentials, licenses, and document proofs have been received by the MediCare+ Credentialing Committee.',
+                'Your doctor profile is currently under review. Our medical credentialing team is verifying your council license and degree documents with the NMC.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13.5, color: AppColors.textSecondary, height: 1.4),
+                style: TextStyle(fontSize: 13.5, color: AppColors.textSecondary, height: 1.45),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               Container(
                 padding: const EdgeInsets.all(16),
@@ -1813,11 +1849,13 @@ class _DoctorRegistrationScreenState
                   children: [
                     _buildSummaryRow('Applicant', _nameController.text.trim()),
                     const Divider(height: 16, color: AppColors.borderLight),
-                    _buildSummaryRow('Specialization', _selectedSpecialty ?? 'Specialist'),
+                    _buildSummaryRow('Specialization', _selectedSpecialty ?? 'General Physician'),
+                    const Divider(height: 16, color: AppColors.borderLight),
+                    _buildSummaryRow('Council', _stateCouncil),
                     const Divider(height: 16, color: AppColors.borderLight),
                     _buildSummaryRow('Documents Attached', '${_uploadedDocs.length} Verified Files'),
                     const Divider(height: 16, color: AppColors.borderLight),
-                    _buildSummaryRow('Review Status', 'Under Audit (24-48 hrs)'),
+                    _buildSummaryRow('Status', 'Under Verification (24-48 hrs)'),
                   ],
                 ),
               ),
@@ -1840,7 +1878,7 @@ class _DoctorRegistrationScreenState
                     );
                   },
                   child: const Text(
-                    'Return to Login',
+                    'Go to Login',
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
                   ),
                 ),
@@ -1856,13 +1894,12 @@ class _DoctorRegistrationScreenState
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: () {
-                    Navigator.of(context).pushNamedAndRemoveUntil(
-                      AppRoutes.doctorDashboard,
-                      (route) => false,
+                    Navigator.of(context).pushReplacementNamed(
+                      AppRoutes.doctorVerificationStatus,
                     );
                   },
                   child: const Text(
-                    'Open Doctor Dashboard (Preview Mode)',
+                    'Track Verification Timeline',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                   ),
                 ),

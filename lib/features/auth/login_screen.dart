@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/routes/app_routes.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/doctor_verification_provider.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/medicare_logo.dart';
@@ -33,6 +34,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ref.read(authProvider.notifier).loginAsPatient();
       Navigator.of(context).pushReplacementNamed(AppRoutes.mainShell);
     } else {
+      // Doctor login verification check
+      final verificationState = ref.read(doctorVerificationProvider);
+      if (verificationState.isUnderReview) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.hourglass_top_rounded, color: Colors.white, size: 18),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Your doctor profile is under verification. Credential review in progress.',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Color(0xFFD97706),
+            duration: Duration(seconds: 4),
+          ),
+        );
+        Navigator.of(context).pushNamed(AppRoutes.doctorVerificationStatus);
+        return;
+      }
+
       ref.read(authProvider.notifier).loginAsDoctor();
       Navigator.of(context).pushReplacementNamed(AppRoutes.doctorDashboard);
     }
@@ -238,7 +264,77 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
 
-              const SizedBox(height: 12),
+              if (_selectedRole == UserRole.doctor &&
+                  ref.watch(doctorVerificationProvider).isUnderReview) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFEF3C7),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.hourglass_top_rounded,
+                            color: Color(0xFFD97706), size: 18),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Profile Under Verification',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFB45309),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'App #${ref.watch(doctorVerificationProvider).application.applicationId} is being audited by the NMC credentialing board.',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: Color(0xFF92400E),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context)
+                              .pushNamed(AppRoutes.doctorVerificationStatus);
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          'View',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFB45309),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 6),
 
               // Login Button
               AppButton(

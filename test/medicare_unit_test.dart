@@ -8,6 +8,7 @@ import 'package:medicare_plus/providers/appointment_provider.dart';
 import 'package:medicare_plus/providers/chat_provider.dart';
 import 'package:medicare_plus/providers/wallet_provider.dart';
 import 'package:medicare_plus/providers/prescription_provider.dart';
+import 'package:medicare_plus/providers/doctor_verification_provider.dart';
 import 'package:medicare_plus/models/wallet_model.dart';
 import 'package:medicare_plus/models/prescription_model.dart';
 import 'package:flutter/material.dart';
@@ -272,6 +273,56 @@ void main() {
       expect(updatedRx.fulfillmentType, OrderFulfillmentType.orderedOnline);
       expect(updatedRx.pharmacyStatus, PharmacyOrderStatus.placed);
       expect(updatedRx.deliveryAddress, 'Flat 402, Sunshine Heights, Mumbai');
+    });
+  });
+
+  group('Doctor Verification & Review Lifecycle Tests', () {
+    test('Default doctor state is under review with initial application', () {
+      final container = ProviderContainer();
+      final state = container.read(doctorVerificationProvider);
+      expect(state.isUnderReview, true);
+      expect(state.application.status, DoctorVerificationStatus.underReview);
+      expect(state.application.applicationId.isNotEmpty, true);
+    });
+
+    test('Submitting application sets details and maintains under review state', () {
+      final container = ProviderContainer();
+      container.read(doctorVerificationProvider.notifier).submitApplication(
+            applicationId: 'MED-DOC-99881',
+            fullName: 'Dr. Ananya Roy',
+            email: 'ananya@medicare.com',
+            phone: '+91 91234 56789',
+            primaryDegree: 'MBBS (AIIMS New Delhi)',
+            postGradDegree: 'MD Cardiology',
+            councilName: 'Delhi Medical Council',
+            licenseNumber: 'DMC/2016/54321',
+            specialization: 'Cardiologist',
+            clinicName: 'Heart Health Clinic',
+            uploadedDocsCount: 6,
+          );
+
+      final state = container.read(doctorVerificationProvider);
+      expect(state.isUnderReview, true);
+      expect(state.application.applicationId, 'MED-DOC-99881');
+      expect(state.application.fullName, 'Dr. Ananya Roy');
+      expect(state.application.licenseNumber, 'DMC/2016/54321');
+      expect(state.application.uploadedDocsCount, 6);
+      expect(state.application.status, DoctorVerificationStatus.underReview);
+    });
+
+    test('Simulating admin approval marks doctor approved and enables dashboard access', () {
+      final container = ProviderContainer();
+      container.read(doctorVerificationProvider.notifier).simulateAdminApproval();
+
+      final state = container.read(doctorVerificationProvider);
+      expect(state.isUnderReview, false);
+      expect(state.application.status, DoctorVerificationStatus.approved);
+
+      // Can reset back to review
+      container.read(doctorVerificationProvider.notifier).resetToUnderReview();
+      final resetState = container.read(doctorVerificationProvider);
+      expect(resetState.isUnderReview, true);
+      expect(resetState.application.status, DoctorVerificationStatus.underReview);
     });
   });
 }
