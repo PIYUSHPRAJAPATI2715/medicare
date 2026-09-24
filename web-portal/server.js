@@ -168,6 +168,171 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname.startsWith('/api/')) {
+    // 0. Auth - Login
+    if (pathname === '/api/auth/login' && req.method === 'POST') {
+      const body = await parseBody(req);
+      const { emailOrPhone, password, role } = body || {};
+
+      if (!emailOrPhone || !password) {
+        return sendJson(res, 400, {
+          status: 400,
+          success: false,
+          message: 'Email/Phone and password are required',
+          data: null,
+        });
+      }
+
+      const cleanInput = String(emailOrPhone).trim().toLowerCase();
+      const targetRole = role ? String(role).toLowerCase() : 'patient';
+
+      if (targetRole === 'doctor') {
+        const doctor = db.doctors.find(
+          d => (d.email && d.email.toLowerCase() === cleanInput) ||
+               (d.phone && d.phone.replace(/[\s-]/g, '') === cleanInput.replace(/[\s-]/g, '')) ||
+               d.name.toLowerCase().includes(cleanInput)
+        );
+
+        if (!doctor) {
+          return sendJson(res, 404, {
+            status: 404,
+            success: false,
+            message: 'Doctor account not found with given credentials.',
+            data: null,
+          });
+        }
+
+        if (doctor.verificationStatus === 'pending' || !doctor.isVerified) {
+          return sendJson(res, 403, {
+            status: 403,
+            success: false,
+            message: 'Your doctor profile is under verification. Credential review in progress.',
+            data: { status: 'pending', isVerified: false, doctor },
+          });
+        }
+
+        return sendJson(res, 200, {
+          status: 200,
+          success: true,
+          message: 'Doctor login successful',
+          data: {
+            token: `jwt_doc_${doctor.id}_${Date.now()}`,
+            user: {
+              id: doctor.id,
+              name: doctor.name,
+              email: doctor.email || `${doctor.id}@medicare.com`,
+              phone: doctor.phone || '+91 98290 11223',
+              role: 'doctor',
+              avatarUrl: doctor.imageUrl,
+              specialty: doctor.specialty,
+              isVerified: doctor.isVerified,
+              verificationStatus: doctor.verificationStatus,
+            },
+          },
+        });
+      }
+
+      // Patient / Admin login
+      let user = db.users.find(
+        u => (u.email && u.email.toLowerCase() === cleanInput) ||
+             (u.phone && u.phone.replace(/[\s-]/g, '') === cleanInput.replace(/[\s-]/g, ''))
+      );
+
+      if (!user && targetRole === 'patient') {
+        user = db.users.find(u => u.role === 'patient');
+      }
+
+      if (!user) {
+        return sendJson(res, 404, {
+          status: 404,
+          success: false,
+          message: 'Account not found. Please register first.',
+          data: null,
+        });
+      }
+
+      return sendJson(res, 200, {
+        status: 200,
+        success: true,
+        message: 'Login successful',
+        data: {
+          token: `jwt_${user.id}_${Date.now()}`,
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            role: user.role || targetRole,
+            status: user.status || 'active',
+            avatarUrl: user.avatarUrl,
+            currentCity: user.currentCity || 'Jaipur',
+          },
+        },
+      });
+    }
+
+    // 0. Auth - Register Patient
+    if ((pathname === '/api/auth/register-patient' || pathname === '/api/auth/signup') && req.method === 'POST') {
+      const body = await parseBody(req);
+      const { name, email, phone, gender, dob, currentCity } = body || {};
+
+      if (!name || !phone) {
+        return sendJson(res, 400, {
+          status: 400,
+          success: false,
+          message: 'Full Name and Phone Number are required fields',
+          data: null,
+        });
+      }
+
+      const newUser = {
+        id: `u_${Date.now()}`,
+        name,
+        email: email || '',
+        phone,
+        role: 'patient',
+        status: 'active',
+        gender: gender || 'Male',
+        dob: dob || '1995-08-15',
+        currentCity: currentCity || 'Jaipur',
+        createdAt: new Date().toISOString(),
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+      };
+      db.users.unshift(newUser);
+
+      return sendJson(res, 201, {
+        status: 201,
+        success: true,
+        message: 'Patient account created successfully',
+        data: { token: `jwt_${newUser.id}_${Date.now()}`, user: newUser },
+      });
+    }
+
+    // 0. Auth - Doctor Verification Status
+    if (pathname.startsWith('/api/auth/doctor-status') && req.method === 'GET') {
+      const parts = pathname.split('/');
+      const queryId = urlParts[1] ? new URLSearchParams(urlParts[1]).get('id') : null;
+      const id = parts[4] || queryId;
+      const doc = db.doctors.find(d => d.id === id);
+
+      if (!doc) {
+        return sendJson(res, 404, { status: 404, success: false, message: 'Doctor not found', data: null });
+      }
+
+      const status = doc.verificationStatus || (doc.isVerified ? 'approved' : 'pending');
+      return sendJson(res, 200, {
+        status: 200,
+        success: true,
+        message: 'Doctor status fetched',
+        data: {
+          doctorId: doc.id,
+          name: doc.name,
+          status,
+          isVerified: status === 'approved',
+          rejectionReason: doc.rejectionNotes || null,
+        },
+      });
+    }
+
     // 1. Users
     if (pathname === '/api/users' && req.method === 'GET') {
       return sendJson(res, 200, { success: true, count: db.users.length, data: db.users });
@@ -323,6 +488,125 @@ const server = http.createServer(async (req, res) => {
         uid,
         token,
       });
+    }
+
+    // 10. Diseases
+    if (pathname === '/api/diseases' && req.method === 'GET') {
+      const diseases = [
+        { id: 'dis_1', name: 'Fever & Chills', specialty: 'General Physician', symptomCount: '12 Symptoms' },
+        { id: 'dis_2', name: 'Cough, Cold & Flu', specialty: 'General Physician', symptomCount: '8 Symptoms' },
+        { id: 'dis_3', name: 'Skin Acne & Pimples', specialty: 'Dermatologist', symptomCount: '6 Symptoms' },
+        { id: 'dis_4', name: 'Hair Fall & Dandruff', specialty: 'Dermatologist', symptomCount: '5 Symptoms' },
+        { id: 'dis_5', name: 'Child Fever & Vomiting', specialty: 'Pediatrician', symptomCount: '10 Symptoms' },
+        { id: 'dis_6', name: 'Pregnancy & Periods', specialty: 'Gynecologist', symptomCount: '14 Symptoms' },
+        { id: 'dis_7', name: 'Chest Pain & BP', specialty: 'Cardiologist', symptomCount: '7 Symptoms' },
+        { id: 'dis_8', name: 'Anxiety & Depression', specialty: 'Psychiatrist', symptomCount: '9 Symptoms' },
+        { id: 'dis_9', name: 'Diabetes Management', specialty: 'General Physician', symptomCount: '11 Symptoms' },
+        { id: 'dis_10', name: 'Knee & Joint Pain', specialty: 'Orthopedic', symptomCount: '8 Symptoms' },
+      ];
+      return sendJson(res, 200, { status: 200, success: true, count: diseases.length, data: diseases });
+    }
+
+    // 11. Wallet
+    if (pathname.startsWith('/api/wallet')) {
+      const parts = pathname.split('/');
+      const queryId = urlParts[1] ? new URLSearchParams(urlParts[1]).get('userId') : null;
+      const userId = parts[3] || queryId || 'u1';
+
+      if (!db.wallets) db.wallets = {};
+      if (!db.wallets[userId]) {
+        db.wallets[userId] = {
+          userId,
+          balance: 1450.0,
+          totalCashbackEarned: 185.0,
+          transactions: [
+            {
+              id: 'tx_101',
+              title: 'HealthPay Balance Added',
+              description: 'Top-up via UPI (Google Pay)',
+              amount: 1000.0,
+              isCredit: true,
+              category: 'topUp',
+              timestamp: '2026-09-22T09:14:00Z',
+              referenceId: 'UPI-9841278129',
+              status: 'completed',
+            },
+            {
+              id: 'tx_102',
+              title: 'Consultation Fee Paid',
+              description: 'Paid to Dr. Rajesh Sharma',
+              amount: 499.0,
+              isCredit: false,
+              category: 'consultation',
+              timestamp: '2026-09-22T10:30:00Z',
+              referenceId: 'MED-CONS-88219',
+              status: 'completed',
+            },
+          ],
+        };
+      }
+
+      if (req.method === 'POST') {
+        const body = await parseBody(req);
+        const { action, amount, paymentMethod } = body || {};
+        const pAmt = Math.abs(Number(amount)) || 0;
+
+        if (action === 'pay' || pathname.endsWith('/pay')) {
+          db.wallets[userId].balance -= pAmt;
+          return sendJson(res, 200, { status: 200, success: true, message: 'Payment completed', data: db.wallets[userId] });
+        }
+
+        db.wallets[userId].balance += pAmt;
+        return sendJson(res, 200, { status: 200, success: true, message: `₹${pAmt} added`, data: db.wallets[userId] });
+      }
+
+      return sendJson(res, 200, { status: 200, success: true, data: db.wallets[userId] });
+    }
+
+    // 12. Subscriptions
+    if (pathname.startsWith('/api/subscriptions')) {
+      const parts = pathname.split('/');
+      const queryId = urlParts[1] ? new URLSearchParams(urlParts[1]).get('userId') : null;
+      const userId = parts[3] || queryId || 'u1';
+
+      if (!db.subscriptions) {
+        db.subscriptions = [
+          {
+            id: 'sub_101',
+            userId: 'u1',
+            planId: 'plan_gold',
+            planName: 'Gold Family Shield',
+            status: 'active',
+            startDate: '2026-08-01T00:00:00Z',
+            expiryDate: '2027-02-01T00:00:00Z',
+            price: 699,
+            consultationsRemaining: -1,
+            features: ['Unlimited 24/7 Consultations', 'Family coverage for 4'],
+          },
+        ];
+      }
+
+      if (req.method === 'POST') {
+        const body = await parseBody(req);
+        if (pathname.endsWith('/cancel') || body.action === 'cancel') {
+          return sendJson(res, 200, { status: 200, success: true, message: 'Subscription cancelled', data: { status: 'cancelled' } });
+        }
+        const newSub = { id: `sub_${Date.now()}`, userId, planId: body.planId || 'plan_gold', planName: body.planName || 'Gold Shield', status: 'active' };
+        db.subscriptions.unshift(newSub);
+        return sendJson(res, 201, { status: 201, success: true, message: 'Subscription activated', data: newSub });
+      }
+
+      const sub = db.subscriptions.find(s => s.userId === userId && s.status === 'active') || null;
+      return sendJson(res, 200, { status: 200, success: true, data: sub });
+    }
+
+    // 13. Payments
+    if (pathname.startsWith('/api/payments')) {
+      const body = await parseBody(req);
+      if (pathname.endsWith('/verify-success') || body.action === 'verify-success') {
+        return sendJson(res, 200, { status: 200, success: true, message: 'Payment confirmed', data: { status: 'PAID' } });
+      }
+      return sendJson(res, 200, { status: 200, success: true, message: 'Order created', data: { orderId: `ORD_${Date.now()}` } });
     }
 
     // Unknown API endpoint fallback
