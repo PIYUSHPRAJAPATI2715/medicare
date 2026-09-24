@@ -15,66 +15,72 @@ import '../models/user_model.dart';
 import '../data/mock/mock_data.dart';
 
 class ApiService {
-  static const List<String> _candidateUrls = [
-    'http://127.0.0.1:5050/api',   // USB connected Android via adb reverse & macOS
+  // ─── Production API (primary) ─────────────────────────────────────────────
+  static const String _productionUrl = 'https://www.drconnects24.com/api';
+
+  // ─── Local fallback candidates (used when production is unreachable) ───────
+  static const List<String> _localCandidateUrls = [
+    'http://127.0.0.1:5050/api',    // USB Android via adb reverse tcp:5050 tcp:5050
     'http://10.0.2.2:5050/api',     // Android Emulator
     'http://192.168.31.111:5050/api', // LAN Wi-Fi
-    'http://localhost:5050/api',    // Web / local
+    'http://localhost:5050/api',    // Web / macOS desktop
   ];
 
-  static String _activeBaseUrl = (kIsWeb || defaultTargetPlatform != TargetPlatform.android)
-      ? 'http://localhost:5050/api'
-      : 'http://127.0.0.1:5050/api';
+  // The currently active base URL — starts with production
+  static String _activeBaseUrl = _productionUrl;
 
   static String get baseUrl => _activeBaseUrl;
 
+  /// Make HTTP request, always try production first, then local candidates.
   static Future<http.Response> _safeRequest(
     Future<http.Response> Function(String url) requestFn, {
-    Duration timeout = const Duration(seconds: 4),
+    Duration timeout = const Duration(seconds: 8),
   }) async {
-    Object? lastError;
+    // Always try production first regardless of _activeBaseUrl
     try {
-      debugPrint('📡 [ApiService OUT] Request -> $_activeBaseUrl');
-      final res = await requestFn(_activeBaseUrl).timeout(timeout);
-      debugPrint('✅ [ApiService IN] Response <- $_activeBaseUrl (HTTP ${res.statusCode})');
-      return res;
-    } catch (e) {
-      lastError = e;
-      debugPrint('⚠️ [ApiService] Initial request to $_activeBaseUrl failed ($e). Searching alternate endpoints...');
-      for (final candidate in _candidateUrls) {
-        if (candidate == _activeBaseUrl) continue;
-        try {
-          debugPrint('🔄 [ApiService] Probing fallback candidate: $candidate');
-          final res = await requestFn(candidate).timeout(const Duration(seconds: 3));
-          _activeBaseUrl = candidate;
-          debugPrint('🎉 [ApiService] Connected to live backend at: $_activeBaseUrl (HTTP ${res.statusCode})');
-          return res;
-        } catch (probeErr) {
-          debugPrint('❌ [ApiService] Candidate $candidate unreachable: $probeErr');
-          lastError = probeErr;
-        }
+      debugPrint('📡 [ApiService] → $_productionUrl');
+      final res = await requestFn(_productionUrl).timeout(timeout);
+      if (res.statusCode < 500) {
+        _activeBaseUrl = _productionUrl;
+        debugPrint('✅ [ApiService] ← $_productionUrl (HTTP ${res.statusCode})');
+        return res;
       }
-      throw lastError ?? Exception('All candidate endpoints failed');
+    } catch (prodErr) {
+      debugPrint('⚠️ [ApiService] Production unreachable: $prodErr');
     }
+
+    // Production down or 5xx — try local fallbacks
+    for (final candidate in _localCandidateUrls) {
+      try {
+        debugPrint('🔄 [ApiService] Probing local fallback: $candidate');
+        final res = await requestFn(candidate).timeout(const Duration(seconds: 4));
+        _activeBaseUrl = candidate;
+        debugPrint('🎉 [ApiService] Local backend connected: $candidate (HTTP ${res.statusCode})');
+        return res;
+      } catch (_) {}
+    }
+
+    throw Exception('[ApiService] All endpoints failed. Check network and server.');
   }
 
-  /// Preload core catalogs on app launch to populate memory & verify connection
+  /// Preload core catalogs on app launch to verify connection & warm data cache
   static Future<void> prewarmAllCoreApis() async {
-    debugPrint('🚀 [ApiService] Starting background pre-warm of core health APIs...');
+    debugPrint('🚀 [ApiService] Pre-warming core APIs from $_productionUrl ...');
     try {
-      final futures = await Future.wait([
+      final results = await Future.wait([
         fetchDoctors(),
         fetchSpecialties(),
         fetchPlans(),
-        fetchDiseases(),
         fetchHospitals(),
+        fetchAppointments(userId: 'u1'),
       ], eagerError: false);
-      final docs = futures[0] as List;
-      final specs = futures[1] as List;
-      final plans = futures[2] as List;
-      debugPrint('🌟 [ApiService] Prewarm completed! Loaded ${docs.length} doctors, ${specs.length} specialties, ${plans.length} care plans.');
+      debugPrint('🌟 [ApiService] Prewarm done! '
+          '${(results[0] as List).length} doctors, '
+          '${(results[1] as List).length} specialties, '
+          '${(results[2] as List).length} plans, '
+          '${(results[3] as List).length} hospitals loaded.');
     } catch (e) {
-      debugPrint('⚠️ [ApiService] Prewarm encountered error: $e');
+      debugPrint('⚠️ [ApiService] Prewarm error: $e');
     }
   }
 
