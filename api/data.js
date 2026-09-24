@@ -400,3 +400,80 @@ export const initialAppointments = [
     fee: 650,
   },
 ];
+
+export const initialDiseases = [
+  { id: 'dis_1', name: 'Fever & Chills', specialty: 'General Physician', symptomCount: '12 Symptoms' },
+  { id: 'dis_2', name: 'Cough, Cold & Flu', specialty: 'General Physician', symptomCount: '8 Symptoms' },
+  { id: 'dis_3', name: 'Skin Acne & Pimples', specialty: 'Dermatologist', symptomCount: '6 Symptoms' },
+  { id: 'dis_4', name: 'Hair Fall & Dandruff', specialty: 'Dermatologist', symptomCount: '5 Symptoms' },
+  { id: 'dis_5', name: 'Child Fever & Vomiting', specialty: 'Pediatrician', symptomCount: '10 Symptoms' },
+  { id: 'dis_6', name: 'Pregnancy & Periods', specialty: 'Gynecologist', symptomCount: '14 Symptoms' },
+  { id: 'dis_7', name: 'Chest Pain & BP', specialty: 'Cardiologist', symptomCount: '7 Symptoms' },
+  { id: 'dis_8', name: 'Anxiety & Depression', specialty: 'Psychiatrist', symptomCount: '9 Symptoms' },
+  { id: 'dis_9', name: 'Diabetes Management', specialty: 'General Physician', symptomCount: '11 Symptoms' },
+  { id: 'dis_10', name: 'Knee & Joint Pain', specialty: 'Orthopedic', symptomCount: '8 Symptoms' },
+];
+
+export const initialWallets = {
+  'u1': {
+    userId: 'u1',
+    balance: 1450.0,
+    totalCashbackEarned: 185.0,
+    transactions: [
+      {
+        id: 'tx_101',
+        title: 'HealthPay Balance Added',
+        description: 'Top-up via UPI (Google Pay)',
+        amount: 1000.0,
+        isCredit: true,
+        category: 'topUp',
+        timestamp: '2026-09-22T09:14:00Z',
+        referenceId: 'UPI-9841278129',
+        status: 'completed',
+      },
+      {
+        id: 'tx_102',
+        title: 'Consultation Fee Paid',
+        description: 'Paid to Dr. Rajesh Sharma',
+        amount: 499.0,
+        isCredit: false,
+        category: 'consultation',
+        timestamp: '2026-09-22T10:30:00Z',
+        referenceId: 'MED-CONS-88219',
+        status: 'completed',
+      },
+      {
+        id: 'tx_103',
+        title: '5% Instant Health Cashback',
+        description: 'Rewarded for Telehealth Consultation',
+        amount: 25.0,
+        isCredit: true,
+        category: 'cashback',
+        timestamp: '2026-09-22T10:31:00Z',
+        referenceId: 'CB-99214',
+        status: 'completed',
+      },
+    ],
+  },
+};
+
+export const initialSubscriptions = [
+  {
+    id: 'sub_101',
+    userId: 'u1',
+    planId: 'plan_gold',
+    planName: 'Gold Family Shield',
+    status: 'active',
+    startDate: '2026-08-01T00:00:00Z',
+    expiryDate: '2027-02-01T00:00:00Z',
+    price: 699,
+    consultationsRemaining: -1,
+    features: [
+      'Unlimited 24/7 Video & Audio Consultations',
+      'Direct connection to MD Specialists',
+      'Family coverage for up to 4 members',
+      '20% Off all prescribed medicines',
+    ],
+  },
+];
+
