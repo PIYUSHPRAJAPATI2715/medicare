@@ -318,10 +318,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: AppColors.primary,
+                              color: AppColors.primaryLight,
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.medical_services_rounded, color: Colors.white, size: 20),
+                            child: const Icon(Icons.medical_services_outlined, color: AppColors.primary, size: 20),
                           ),
                           const SizedBox(width: 12),
                           const Expanded(
@@ -332,15 +332,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   'New Healthcare Provider?',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                     color: AppColors.textPrimary,
                                   ),
                                 ),
                                 SizedBox(height: 2),
                                 Text(
-                                  'Complete 7-Step Verified Registration with Council Documents & Clinic setup.',
+                                  'Register your medical credentials and clinic practice on MediCare+.',
                                   style: TextStyle(
-                                    fontSize: 11.5,
+                                    fontSize: 12,
                                     color: AppColors.textSecondary,
                                   ),
                                 ),
@@ -352,25 +352,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: 14),
                       SizedBox(
                         width: double.infinity,
-                        child: OutlinedButton.icon(
+                        child: OutlinedButton(
                           onPressed: () {
                             Navigator.of(context).pushNamed(AppRoutes.doctorRegister);
                           },
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: AppColors.primary, width: 1.5),
+                            side: const BorderSide(color: AppColors.primary),
                             backgroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          icon: const Icon(Icons.app_registration_rounded, color: AppColors.primary, size: 18),
-                          label: const Text(
-                            'Doctor Registration & Document Vault',
+                          child: const Text(
+                            'Apply for Doctor Registration',
                             style: TextStyle(
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w600,
                               color: AppColors.primary,
-                              fontSize: 13,
+                              fontSize: 13.5,
                             ),
                           ),
                         ),

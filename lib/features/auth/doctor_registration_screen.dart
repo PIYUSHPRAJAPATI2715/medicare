@@ -1,10 +1,41 @@
-import "package:flutter/material.dart";
-import "package:flutter_riverpod/flutter_riverpod.dart";
-import "package:intl/intl.dart";
-import "../../core/theme/app_colors.dart";
-import "../../core/routes/app_routes.dart";
-import "../../providers/specialty_provider.dart";
-import "../../services/api_service.dart";
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:intl/intl.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/routes/app_routes.dart';
+import '../../providers/specialty_provider.dart';
+
+/// Representation of an actual uploaded document or photo
+class UploadedDoc {
+  final String fileName;
+  final String? filePath;
+  final Uint8List? fileBytes;
+  final int fileSizeBytes;
+  final bool isPdf;
+  final DateTime uploadedAt;
+
+  UploadedDoc({
+    required this.fileName,
+    this.filePath,
+    this.fileBytes,
+    required this.fileSizeBytes,
+    required this.isPdf,
+    required this.uploadedAt,
+  });
+
+  String get formattedSize {
+    if (fileSizeBytes < 1024) return '$fileSizeBytes B';
+    if (fileSizeBytes < 1024 * 1024) {
+      return '${(fileSizeBytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(fileSizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+}
 
 class DoctorRegistrationScreen extends ConsumerStatefulWidget {
   const DoctorRegistrationScreen({super.key});
@@ -17,193 +48,165 @@ class DoctorRegistrationScreen extends ConsumerStatefulWidget {
 class _DoctorRegistrationScreenState
     extends ConsumerState<DoctorRegistrationScreen> {
   final _scrollController = ScrollController();
-  int _currentStep = 0; // 0 to 6 (7 steps), 7 = Success screen
+  final _formKey = GlobalKey<FormState>();
+
+  int _currentStep = 0; // 0 to 6 = 7 steps; 7 = submission success
   bool _isSubmitting = false;
 
+  // Real uploaded documents vault mapping: docKey -> UploadedDoc
+  final Map<String, UploadedDoc> _uploadedDocs = {};
+  UploadedDoc? _profilePhoto;
+
   // -------------------------------------------------------------
-  // 1. BASIC INFORMATION
+  // STEP 1: PERSONAL INFORMATION
   // -------------------------------------------------------------
-  final _nameController = TextEditingController(text: "Dr. Vikramaditya Rathore");
-  final _emailController = TextEditingController(text: "dr.vikramaditya@medicare.com");
-  final _phoneController = TextEditingController(text: "+91 98112 34567");
-  final _altPhoneController = TextEditingController(text: "+91 94140 12345");
-  final _passwordController = TextEditingController(text: "Medical@Pass2026");
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _altPhoneController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  String _gender = "Male";
-  DateTime _dateOfBirth = DateTime(1987, 4, 12);
-  String _profilePhotoUrl =
-      "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=400";
+  String _gender = 'Male';
+  DateTime? _dateOfBirth;
 
   // -------------------------------------------------------------
-  // 2. MEDICAL QUALIFICATIONS & EDUCATION
+  // STEP 2: MEDICAL QUALIFICATIONS & EDUCATION
   // -------------------------------------------------------------
-  String _primaryDegree = "MBBS";
-  final _primaryCollegeController =
-      TextEditingController(text: "SMS Medical College & Hospital, Jaipur");
-  final _primaryPassingYearController = TextEditingController(text: "2011");
-  String _primaryDegreeCertUrl =
-      "https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?w=800";
+  String _primaryDegree = 'MBBS';
+  final _primaryCollegeController = TextEditingController();
+  final _primaryPassingYearController = TextEditingController();
 
-  String _postGradDegree = "MD (Internal Medicine)";
-  final _postGradCollegeController =
-      TextEditingController(text: "AIIMS New Delhi");
-  final _postGradPassingYearController = TextEditingController(text: "2015");
-  String _postGradCertUrl =
-      "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800";
+  String _postGradDegree = 'None';
+  final _postGradCollegeController = TextEditingController();
+  final _postGradPassingYearController = TextEditingController();
 
   // -------------------------------------------------------------
-  // 3. REGISTRATION & SPECIALIZATION (FROM ADMIN SPECIALTIES)
+  // STEP 3: REGISTRATION & SPECIALIZATION
   // -------------------------------------------------------------
-  final _licenseNoController = TextEditingController(text: "RMC/2011/77321");
-  String _stateCouncil = "Rajasthan Medical Council";
-  final _registrationStateController = TextEditingController(text: "Rajasthan");
-  final _registrationYearController = TextEditingController(text: "2011");
-  final _expiryYearController = TextEditingController(text: "2036");
-
-  // Selected Specialization (Fetched dynamically from Admin)
-  String _selectedSpecialty = "Cardiologist";
-  final _subSpecialtyController =
-      TextEditingController(text: "Interventional Cardiology & Angiography");
-  final _experienceYearsController = TextEditingController(text: "12");
-  final List<String> _selectedLanguages = ["English", "Hindi", "Punjabi"];
+  final _licenseNoController = TextEditingController();
+  String _stateCouncil = 'National Medical Commission (NMC / MCI)';
+  final _registrationYearController = TextEditingController();
+  final _expiryYearController = TextEditingController();
+  String? _selectedSpecialty;
+  final _subSpecialtyController = TextEditingController();
+  final _experienceYearsController = TextEditingController();
+  final List<String> _selectedLanguages = ['English', 'Hindi'];
 
   // -------------------------------------------------------------
-  // 4. CLINIC / HOSPITAL INFORMATION
+  // STEP 4: CLINIC / HOSPITAL DETAILS
   // -------------------------------------------------------------
-  final _clinicNameController =
-      TextEditingController(text: "Rathore Heart & Multispecialty Clinic");
-  final _clinicAddressController =
-      TextEditingController(text: "Plot 12, JLN Marg, Near World Trade Park");
-  final _cityController = TextEditingController(text: "Jaipur");
-  final _stateController = TextEditingController(text: "Rajasthan");
-  final _pincodeController = TextEditingController(text: "302018");
-  final _landmarkController =
-      TextEditingController(text: "Opposite Gaurav Tower, Malviya Nagar");
-  String _consultationType = "both"; // "in_person", "video", "both"
+  final _clinicNameController = TextEditingController();
+  final _clinicAddressController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
+  final _pincodeController = TextEditingController();
+  final _landmarkController = TextEditingController();
+  String _consultationType = 'both'; // 'in_person', 'video', 'both'
 
   // -------------------------------------------------------------
-  // 5. CONSULTATION DETAILS & AVAILABILITY
+  // STEP 5: CONSULTATION SCHEDULE & FEES
   // -------------------------------------------------------------
-  final _inPersonFeeController = TextEditingController(text: "800");
-  final _videoFeeController = TextEditingController(text: "650");
-  final _followUpFeeController = TextEditingController(text: "400");
-  String _slotDuration = "20 mins";
-  final List<String> _availableDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  final _inPersonFeeController = TextEditingController();
+  final _videoFeeController = TextEditingController();
+  final _followUpFeeController = TextEditingController();
+  String _slotDuration = '20 mins';
+  final List<String> _availableDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   final List<String> _availableTimeSlots = [
-    "Morning (09:00 AM - 01:00 PM)",
-    "Evening (05:00 PM - 09:00 PM)"
+    'Morning (09:00 AM - 01:00 PM)',
+    'Evening (05:00 PM - 09:00 PM)'
   ];
-  bool _emergencyAvailable = true;
+  bool _emergencyAvailable = false;
 
   // -------------------------------------------------------------
-  // 6. DOCUMENTS & VERIFICATION UPLOADS
+  // STEP 7: BANK & ETHICAL DECLARATIONS
   // -------------------------------------------------------------
-  String _medicalCouncilCertUrl =
-      "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800";
-  String _idProofUrl =
-      "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800";
-  String _clinicProofUrl =
-      "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=800";
-  String _signatureUrl =
-      "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800";
-  String _otherCertUrl =
-      "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800";
+  final _accountHolderController = TextEditingController();
+  final _bankNameController = TextEditingController();
+  final _accountNoController = TextEditingController();
+  final _confirmAccountNoController = TextEditingController();
+  final _ifscController = TextEditingController();
+  final _upiIdController = TextEditingController();
+  final _panController = TextEditingController();
+  final _aboutBioController = TextEditingController();
 
-  // -------------------------------------------------------------
-  // 7. BANK / PAYMENT DETAILS & PROFILE BIO
-  // -------------------------------------------------------------
-  final _accountHolderController =
-      TextEditingController(text: "Dr. Vikramaditya Rathore");
-  final _bankNameController = TextEditingController(text: "HDFC Bank");
-  final _accountNoController = TextEditingController(text: "50100492817263");
-  final _confirmAccountNoController =
-      TextEditingController(text: "50100492817263");
-  final _ifscController = TextEditingController(text: "HDFC0001234");
-  final _upiIdController = TextEditingController(text: "drvikram@okhdfcbank");
-  final _panController = TextEditingController(text: "ABCDE1234F");
+  bool _agreeCodeOfConduct = false;
+  bool _agreeTelemedicineGuidelines = false;
 
-  final _aboutBioController = TextEditingController(
-      text:
-          "Senior Interventional Cardiologist with over 12 years of clinical practice. Specialist in coronary angiography, hypertension management, preventive heart checkups, and tele-cardiology consultations.");
-  final _areasOfExpertiseController = TextEditingController(
-      text:
-          "Clinical Cardiology, 2D Echocardiography, Coronary Angiography, Hypertension Control, Lipidology");
-  final _awardsController = TextEditingController(
-      text:
-          "Gold Medalist in MD Medicine (2015), Best Clinical Research Paper - Cardiological Society of India (2021)");
+  String _generatedRegId = '';
 
-  bool _agreeCodeOfConduct = true;
-  bool _agreeTelemedicineGuidelines = true;
-
-  // Generated Registration ID
-  String _generatedRegId = "MED-DOC-77321";
-
-  // State Medical Councils in India
-  final List<String> _indianMedicalCouncils = [
-    "National Medical Commission (NMC / MCI)",
-    "Rajasthan Medical Council",
-    "Delhi Medical Council",
-    "Maharashtra Medical Council",
-    "Karnataka Medical Council",
-    "Tamil Nadu Medical Council",
-    "Uttar Pradesh Medical Council",
-    "West Bengal Medical Council",
-    "Gujarat Medical Council",
-    "Kerala Medical Council",
-    "Andhra Pradesh Medical Council",
-    "Telangana Medical Council",
-    "Punjab Medical Council",
-    "Haryana Medical Council",
-    "Madhya Pradesh Medical Council",
-    "Bihar Medical Council",
-    "Odisha Medical Council",
+  // Council options
+  final List<String> _stateCouncils = [
+    'National Medical Commission (NMC / MCI)',
+    'Rajasthan Medical Council',
+    'Delhi Medical Council',
+    'Maharashtra Medical Council',
+    'Karnataka Medical Council',
+    'Tamil Nadu Medical Council',
+    'Uttar Pradesh Medical Council',
+    'West Bengal Medical Council',
+    'Gujarat Medical Council',
+    'Kerala Medical Council',
+    'Andhra Pradesh Medical Council',
+    'Telangana Medical Council',
+    'Punjab Medical Council',
+    'Haryana Medical Council',
+    'Madhya Pradesh Medical Council',
+    'Bihar Medical Council',
+    'Odisha Medical Council',
   ];
 
-  final List<String> _primaryDegreeOptions = [
-    "MBBS",
-    "BDS",
-    "BAMS (Ayurveda)",
-    "BHMS (Homeopathy)",
-    "BUMS (Unani)",
+  final List<String> _primaryDegrees = [
+    'MBBS',
+    'BDS',
+    'BAMS (Ayurveda)',
+    'BHMS (Homeopathy)',
+    'BUMS (Unani)',
   ];
 
-  final List<String> _postGradDegreeOptions = [
-    "MD (Internal Medicine)",
-    "MS (General Surgery)",
-    "MD (Cardiology / DM)",
-    "MD (Pediatrics)",
-    "MS (Obstetrics & Gynaecology)",
-    "MD (Dermatology)",
-    "MS (Orthopedics)",
-    "DNB (Diplomate of National Board)",
-    "DM (Super-Specialty)",
-    "MCh (Surgical Super-Specialty)",
-    "Fellowship / Diploma",
-    "None / Primary Only",
+  final List<String> _postGradDegrees = [
+    'None',
+    'MD (Internal Medicine)',
+    'MS (General Surgery)',
+    'MD (Cardiology / DM)',
+    'MD (Pediatrics)',
+    'MS (Obstetrics & Gynaecology)',
+    'MD (Dermatology)',
+    'MS (Orthopedics)',
+    'DNB (Diplomate of National Board)',
+    'DM (Super-Specialty)',
+    'MCh (Surgical Super-Specialty)',
+    'Diploma / Fellowship',
   ];
 
   final List<String> _languageOptions = [
-    "English",
-    "Hindi",
-    "Punjabi",
-    "Gujarati",
-    "Marathi",
-    "Bengali",
-    "Tamil",
-    "Telugu",
-    "Malayalam",
-    "Kannada",
-    "Urdu",
+    'English',
+    'Hindi',
+    'Punjabi',
+    'Gujarati',
+    'Marathi',
+    'Bengali',
+    'Tamil',
+    'Telugu',
+    'Malayalam',
+    'Kannada',
+    'Urdu',
   ];
 
-  final List<String> _dayOptions = [
-    "Mon",
-    "Tue",
-    "Wed",
-    "Thu",
-    "Fri",
-    "Sat",
-    "Sun",
+  final List<String> _daysList = [
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+    'Sun'
+  ];
+
+  final List<String> _timeSlotOptions = [
+    'Morning (09:00 AM - 01:00 PM)',
+    'Afternoon (01:00 PM - 05:00 PM)',
+    'Evening (05:00 PM - 09:00 PM)',
+    'Night (09:00 PM - 11:00 PM)'
   ];
 
   @override
@@ -219,7 +222,6 @@ class _DoctorRegistrationScreenState
     _postGradCollegeController.dispose();
     _postGradPassingYearController.dispose();
     _licenseNoController.dispose();
-    _registrationStateController.dispose();
     _registrationYearController.dispose();
     _expiryYearController.dispose();
     _subSpecialtyController.dispose();
@@ -241,8 +243,6 @@ class _DoctorRegistrationScreenState
     _upiIdController.dispose();
     _panController.dispose();
     _aboutBioController.dispose();
-    _areasOfExpertiseController.dispose();
-    _awardsController.dispose();
     super.dispose();
   }
 
@@ -256,99 +256,454 @@ class _DoctorRegistrationScreenState
     }
   }
 
+  void _showSnack(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13.5),
+        ),
+        backgroundColor: isError ? AppColors.error : AppColors.primaryDark,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------
+  // REAL DOCUMENT & PHOTO PICKERS (CAMERA / GALLERY / FILES)
+  // -------------------------------------------------------------
+  Future<void> _pickImage(String docKey, ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
+      );
+      if (picked != null) {
+        final bytes = await picked.readAsBytes();
+        setState(() {
+          if (docKey == 'profile_photo') {
+            _profilePhoto = UploadedDoc(
+              fileName: picked.name,
+              filePath: kIsWeb ? null : picked.path,
+              fileBytes: bytes,
+              fileSizeBytes: bytes.length,
+              isPdf: false,
+              uploadedAt: DateTime.now(),
+            );
+          } else {
+            _uploadedDocs[docKey] = UploadedDoc(
+              fileName: picked.name,
+              filePath: kIsWeb ? null : picked.path,
+              fileBytes: bytes,
+              fileSizeBytes: bytes.length,
+              isPdf: false,
+              uploadedAt: DateTime.now(),
+            );
+          }
+        });
+        _showSnack('Image uploaded successfully');
+      }
+    } catch (e) {
+      _showSnack('Unable to pick image. Please check permissions.', isError: true);
+    }
+  }
+
+  Future<void> _pickFile(String docKey) async {
+    try {
+      final files = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+      );
+      if (files.isNotEmpty) {
+        final file = files.first;
+        final isPdf = file.extension?.toLowerCase() == 'pdf';
+        final bytes = await file.readAsBytes();
+        final size = file.lengthSync() ?? bytes.length;
+
+        setState(() {
+          _uploadedDocs[docKey] = UploadedDoc(
+            fileName: file.name,
+            filePath: file.path,
+            fileBytes: bytes,
+            fileSizeBytes: size,
+            isPdf: isPdf,
+            uploadedAt: DateTime.now(),
+          );
+        });
+        _showSnack('Document attached successfully');
+      }
+    } catch (e) {
+      _showSnack('Unable to select file: $e', isError: true);
+    }
+  }
+
+  void _showDocumentPickerModal(String docKey, String docTitle) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Attach $docTitle',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20, color: AppColors.textTertiary),
+                      onPressed: () => Navigator.pop(ctx),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Supported formats: JPG, PNG, or PDF up to 10MB',
+                  style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 18),
+
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryLight,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.camera_alt_outlined, color: AppColors.primary, size: 22),
+                  ),
+                  title: const Text('Take Photo with Camera',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  subtitle: const Text('Capture certificate directly',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickImage(docKey, ImageSource.camera);
+                  },
+                ),
+                const Divider(height: 1, color: AppColors.borderLight),
+
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.photo_library_outlined, color: Color(0xFF16A34A), size: 22),
+                  ),
+                  title: const Text('Choose from Photo Gallery',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  subtitle: const Text('Select an image from device library',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickImage(docKey, ImageSource.gallery);
+                  },
+                ),
+                const Divider(height: 1, color: AppColors.borderLight),
+
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.picture_as_pdf_outlined, color: Color(0xFFDC2626), size: 22),
+                  ),
+                  title: const Text('Browse Files / PDF',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  subtitle: const Text('Select scanned PDF or document',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickFile(docKey);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showDocumentPreview(UploadedDoc doc, String title) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          insetPadding: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '${doc.fileName} (${doc.formattedSize})',
+                              style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: AppColors.borderLight),
+
+                Expanded(
+                  child: Container(
+                    color: const Color(0xFFF8FAFC),
+                    padding: const EdgeInsets.all(12),
+                    child: Center(
+                      child: doc.isPdf
+                          ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.picture_as_pdf_rounded,
+                                    size: 64, color: Color(0xFFDC2626)),
+                                const SizedBox(height: 12),
+                                Text(
+                                  doc.fileName,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700, fontSize: 14),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'PDF Document • ${doc.formattedSize}',
+                                  style: const TextStyle(
+                                      fontSize: 12, color: AppColors.textSecondary),
+                                ),
+                              ],
+                            )
+                          : InteractiveViewer(
+                              maxScale: 4.0,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: doc.fileBytes != null
+                                    ? Image.memory(doc.fileBytes!, fit: BoxFit.contain)
+                                    : (doc.filePath != null
+                                        ? Image.file(File(doc.filePath!), fit: BoxFit.contain)
+                                        : const Icon(Icons.broken_image_outlined, size: 48)),
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   // -------------------------------------------------------------
   // VALIDATION & STEP ADVANCEMENT
   // -------------------------------------------------------------
   bool _validateCurrentStep() {
     switch (_currentStep) {
-      case 0: // Basic Information
+      case 0:
         if (_nameController.text.trim().isEmpty) {
-          _showSnack("Please enter your full legal name.");
+          _showSnack('Please enter your full legal name.', isError: true);
           return false;
         }
-        if (_phoneController.text.trim().isEmpty) {
-          _showSnack("Please enter your mobile phone number.");
+        if (_emailController.text.trim().isEmpty || !_emailController.text.contains('@')) {
+          _showSnack('Please enter a valid email address.', isError: true);
           return false;
         }
-        if (_emailController.text.trim().isEmpty ||
-            !_emailController.text.contains("@")) {
-          _showSnack("Please enter a valid official email address.");
+        if (_phoneController.text.trim().length < 10) {
+          _showSnack('Please enter a valid 10-digit mobile number.', isError: true);
           return false;
         }
-        if (_passwordController.text.trim().length < 6) {
-          _showSnack("Password must be at least 6 characters long.");
+        if (_passwordController.text.length < 6) {
+          _showSnack('Password must be at least 6 characters long.', isError: true);
+          return false;
+        }
+        if (_dateOfBirth == null) {
+          _showSnack('Please select your Date of Birth.', isError: true);
           return false;
         }
         return true;
 
-      case 1: // Education
+      case 1:
         if (_primaryCollegeController.text.trim().isEmpty) {
-          _showSnack("Please enter your primary medical college/university.");
+          _showSnack('Please enter your Primary Medical College / University.', isError: true);
           return false;
         }
         if (_primaryPassingYearController.text.trim().isEmpty) {
-          _showSnack("Please enter primary graduation year.");
+          _showSnack('Please enter your primary degree graduation year.', isError: true);
+          return false;
+        }
+        if (!_uploadedDocs.containsKey('primary_degree')) {
+          _showSnack('Please upload your Primary Degree Certificate.', isError: true);
           return false;
         }
         return true;
 
-      case 2: // Registration & Specialization
+      case 2:
         if (_licenseNoController.text.trim().isEmpty) {
-          _showSnack("Please enter your State Medical Council registration number.");
+          _showSnack('Please enter your Medical Council Registration / License Number.', isError: true);
+          return false;
+        }
+        if (_registrationYearController.text.trim().isEmpty) {
+          _showSnack('Please enter your Medical Council registration year.', isError: true);
+          return false;
+        }
+        if (_selectedSpecialty == null || _selectedSpecialty!.isEmpty) {
+          _showSnack('Please select your practice specialization.', isError: true);
           return false;
         }
         if (_experienceYearsController.text.trim().isEmpty) {
-          _showSnack("Please specify your years of clinical experience.");
+          _showSnack('Please enter total years of clinical experience.', isError: true);
           return false;
         }
         return true;
 
-      case 3: // Clinic / Hospital
+      case 3:
         if (_clinicNameController.text.trim().isEmpty) {
-          _showSnack("Please enter your clinic or hospital establishment name.");
+          _showSnack('Please enter your Clinic or Hospital name.', isError: true);
           return false;
         }
         if (_clinicAddressController.text.trim().isEmpty) {
-          _showSnack("Please enter your clinic street address.");
+          _showSnack('Please enter your physical clinic street address.', isError: true);
           return false;
         }
         if (_cityController.text.trim().isEmpty) {
-          _showSnack("Please enter your clinic city.");
+          _showSnack('Please enter your clinic city.', isError: true);
+          return false;
+        }
+        if (_pincodeController.text.trim().length < 6) {
+          _showSnack('Please enter a valid 6-digit postal PIN code.', isError: true);
           return false;
         }
         return true;
 
-      case 4: // Consultation Details
-        if (_inPersonFeeController.text.trim().isEmpty ||
-            _videoFeeController.text.trim().isEmpty) {
-          _showSnack("Please set both in-person and video consultation fees.");
+      case 4:
+        if (_inPersonFeeController.text.trim().isEmpty && _videoFeeController.text.trim().isEmpty) {
+          _showSnack('Please specify your consultation fee.', isError: true);
           return false;
         }
         if (_availableDays.isEmpty) {
-          _showSnack("Please select at least one available consultation day.");
+          _showSnack('Please select at least one available consulting day.', isError: true);
           return false;
         }
         return true;
 
-      case 5: // Documents Upload
-        if (_medicalCouncilCertUrl.isEmpty || _idProofUrl.isEmpty) {
-          _showSnack("Please attach mandatory Medical Council Certificate and Govt ID.");
+      case 5:
+        if (!_uploadedDocs.containsKey('council_cert')) {
+          _showSnack('Please upload your State Medical Council Certificate.', isError: true);
+          return false;
+        }
+        if (!_uploadedDocs.containsKey('govt_id')) {
+          _showSnack('Please upload Government Photo ID Proof.', isError: true);
+          return false;
+        }
+        if (!_uploadedDocs.containsKey('clinic_proof')) {
+          _showSnack('Please upload Clinic Establishment / Address Proof.', isError: true);
+          return false;
+        }
+        if (!_uploadedDocs.containsKey('signature')) {
+          _showSnack('Please upload your Signature Specimen for digital prescriptions.', isError: true);
           return false;
         }
         return true;
 
-      case 6: // Bank & Profile
+      case 6:
+        if (_accountHolderController.text.trim().isEmpty) {
+          _showSnack('Please enter the Bank Account Holder Name.', isError: true);
+          return false;
+        }
+        if (_bankNameController.text.trim().isEmpty) {
+          _showSnack('Please enter your Bank Name.', isError: true);
+          return false;
+        }
         if (_accountNoController.text.trim().isEmpty) {
-          _showSnack("Please enter your bank account number.");
+          _showSnack('Please enter your Bank Account Number.', isError: true);
           return false;
         }
-        if (_accountNoController.text.trim() !=
-            _confirmAccountNoController.text.trim()) {
-          _showSnack("Bank account numbers do not match.");
+        if (_accountNoController.text.trim() != _confirmAccountNoController.text.trim()) {
+          _showSnack('Account numbers do not match. Please verify.', isError: true);
+          return false;
+        }
+        if (_ifscController.text.trim().isEmpty) {
+          _showSnack('Please enter your bank IFSC Code.', isError: true);
+          return false;
+        }
+        if (_panController.text.trim().isEmpty) {
+          _showSnack('Please enter your PAN Card Number.', isError: true);
           return false;
         }
         if (!_agreeCodeOfConduct || !_agreeTelemedicineGuidelines) {
-          _showSnack("Please accept NMC Code of Conduct & Telemedicine Guidelines.");
+          _showSnack('Please accept the mandatory NMC regulatory declarations.', isError: true);
           return false;
         }
         return true;
@@ -358,545 +713,106 @@ class _DoctorRegistrationScreenState
     }
   }
 
-  void _nextStep() {
-    if (_validateCurrentStep()) {
-      if (_currentStep < 6) {
-        setState(() => _currentStep++);
-        _scrollToTop();
-      } else {
-        _submitRegistration();
-      }
+  void _nextStep() async {
+    if (!_validateCurrentStep()) return;
+
+    if (_currentStep < 6) {
+      setState(() => _currentStep++);
+      _scrollToTop();
+    } else {
+      // Final Submit
+      setState(() => _isSubmitting = true);
+      await Future.delayed(const Duration(milliseconds: 1000));
+      if (!mounted) return;
+
+      final randomDigits = (10000 + (DateTime.now().millisecondsSinceEpoch % 89999)).toString();
+      setState(() {
+        _isSubmitting = false;
+        _generatedRegId = 'MED-DOC-$randomDigits';
+        _currentStep = 7; // Show success screen
+      });
+      _scrollToTop();
     }
   }
 
-  void _prevStep() {
+  void _previousStep() {
     if (_currentStep > 0) {
       setState(() => _currentStep--);
       _scrollToTop();
+    } else {
+      Navigator.of(context).pop();
     }
   }
 
-  void _showSnack(String msg, {bool isError = true}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              isError
-                  ? Icons.error_outline_rounded
-                  : Icons.check_circle_outline_rounded,
-              color: Colors.white,
-              size: 20,
-            ),
-            const SizedBox(width: 10),
-            Expanded(child: Text(msg, style: const TextStyle(fontSize: 13))),
-          ],
-        ),
-        backgroundColor: isError ? Colors.red.shade700 : AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
-
-  // -------------------------------------------------------------
-  // FAST AUTO-FILL DEMO SHORTCUT
-  // -------------------------------------------------------------
-  void _autoFillDemoProfile() {
-    setState(() {
-      _nameController.text = "Dr. Vikramaditya Rathore";
-      _emailController.text = "dr.vikramaditya@medicare.com";
-      _phoneController.text = "+91 97112 34567";
-      _altPhoneController.text = "+91 94140 88990";
-      _passwordController.text = "DoctorPass@2026";
-      _gender = "Male";
-      _dateOfBirth = DateTime(1987, 4, 12);
-      _profilePhotoUrl =
-          "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=400";
-
-      _primaryDegree = "MBBS";
-      _primaryCollegeController.text =
-          "SMS Medical College & Attached Hospitals, Jaipur";
-      _primaryPassingYearController.text = "2011";
-      _primaryDegreeCertUrl =
-          "https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?w=800";
-
-      _postGradDegree = "MD (Internal Medicine)";
-      _postGradCollegeController.text = "AIIMS New Delhi";
-      _postGradPassingYearController.text = "2015";
-      _postGradCertUrl =
-          "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800";
-
-      _licenseNoController.text = "RMC/2011/77321";
-      _stateCouncil = "Rajasthan Medical Council";
-      _registrationStateController.text = "Rajasthan";
-      _registrationYearController.text = "2011";
-      _expiryYearController.text = "2036";
-      _selectedSpecialty = "Cardiologist";
-      _subSpecialtyController.text =
-          "Interventional Cardiology & Coronary Angiography";
-      _experienceYearsController.text = "12";
-
-      _clinicNameController.text = "Rathore Heart Care & Wellness Clinic";
-      _clinicAddressController.text =
-          "Plot 12, JLN Marg, Near World Trade Park";
-      _cityController.text = "Jaipur";
-      _stateController.text = "Rajasthan";
-      _pincodeController.text = "302018";
-      _landmarkController.text = "Opposite Gaurav Tower, Malviya Nagar";
-      _consultationType = "both";
-
-      _inPersonFeeController.text = "800";
-      _videoFeeController.text = "650";
-      _followUpFeeController.text = "400";
-      _slotDuration = "20 mins";
-      _emergencyAvailable = true;
-
-      _medicalCouncilCertUrl =
-          "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800";
-      _idProofUrl =
-          "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800";
-      _clinicProofUrl =
-          "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=800";
-      _signatureUrl =
-          "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800";
-      _otherCertUrl =
-          "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800";
-
-      _accountHolderController.text = "Dr. Vikramaditya Rathore";
-      _bankNameController.text = "HDFC Bank";
-      _accountNoController.text = "50100492817263";
-      _confirmAccountNoController.text = "50100492817263";
-      _ifscController.text = "HDFC0001234";
-      _upiIdController.text = "drvikram@okhdfcbank";
-      _panController.text = "ABCDE1234F";
-
-      _aboutBioController.text =
-          "Senior Interventional Cardiologist with over 12 years of clinical practice. Specialist in coronary angiography, hypertension management, preventive heart checkups, and tele-cardiology consultations.";
-      _areasOfExpertiseController.text =
-          "Clinical Cardiology, 2D Echocardiography, Coronary Angiography, Hypertension Control, Lipidology";
-      _awardsController.text =
-          "Gold Medalist in MD Medicine (2015), Best Clinical Research Paper - Cardiological Society of India (2021)";
-
-      _agreeCodeOfConduct = true;
-      _agreeTelemedicineGuidelines = true;
-    });
-
-    _showSnack(
-      "Demo practitioner profile, qualifications & 6 docs loaded! Tap Next to review.",
-      isError: false,
-    );
-  }
-
-  // -------------------------------------------------------------
-  // SUBMISSION TO API & BACKEND
-  // -------------------------------------------------------------
-  Future<void> _submitRegistration() async {
-    setState(() => _isSubmitting = true);
-
-    try {
-      final payload = {
-        "name": _nameController.text.trim(),
-        "email": _emailController.text.trim(),
-        "phone": _phoneController.text.trim(),
-        "altPhone": _altPhoneController.text.trim(),
-        "gender": _gender,
-        "dateOfBirth": DateFormat("yyyy-MM-dd").format(_dateOfBirth),
-        "primaryDegree": _primaryDegree,
-        "qualification": "$_primaryDegree, $_postGradDegree",
-        "collegeName": _primaryCollegeController.text.trim(),
-        "graduationYear": _primaryPassingYearController.text.trim(),
-        "postGradDegree": _postGradDegree,
-        "postGradCollege": _postGradCollegeController.text.trim(),
-        "postGradYear": _postGradPassingYearController.text.trim(),
-        "medicalLicenseNo": _licenseNoController.text.trim(),
-        "stateMedicalCouncil": _stateCouncil,
-        "registrationState": _registrationStateController.text.trim(),
-        "registrationYear": _registrationYearController.text.trim(),
-        "licenseExpiryYear": _expiryYearController.text.trim(),
-        "specialty": _selectedSpecialty,
-        "subSpecialty": _subSpecialtyController.text.trim(),
-        "experienceYears":
-            int.tryParse(_experienceYearsController.text.trim()) ?? 5,
-        "languages": _selectedLanguages,
-        "clinicName": _clinicNameController.text.trim(),
-        "clinicAddress": _clinicAddressController.text.trim(),
-        "city": _cityController.text.trim(),
-        "state": _stateController.text.trim(),
-        "pincode": _pincodeController.text.trim(),
-        "landmark": _landmarkController.text.trim(),
-        "consultationType": _consultationType,
-        "consultationFee":
-            double.tryParse(_inPersonFeeController.text.trim()) ?? 500.0,
-        "videoConsultationFee":
-            double.tryParse(_videoFeeController.text.trim()) ?? 450.0,
-        "followUpFee":
-            double.tryParse(_followUpFeeController.text.trim()) ?? 300.0,
-        "slotDuration": _slotDuration,
-        "availableDays": _availableDays,
-        "availableTimeSlots": _availableTimeSlots,
-        "emergencyAvailable": _emergencyAvailable,
-        "medicalCouncilCertUrl": _medicalCouncilCertUrl,
-        "primaryDegreeCertUrl": _primaryDegreeCertUrl,
-        "postGradCertUrl": _postGradCertUrl,
-        "idProofUrl": _idProofUrl,
-        "clinicAddressProofUrl": _clinicProofUrl,
-        "doctorSignatureUrl": _signatureUrl,
-        "otherCertUrl": _otherCertUrl,
-        "imageUrl": _profilePhotoUrl,
-        "accountHolderName": _accountHolderController.text.trim(),
-        "bankName": _bankNameController.text.trim(),
-        "accountNumber": _accountNoController.text.trim(),
-        "ifscCode": _ifscController.text.trim(),
-        "upiId": _upiIdController.text.trim(),
-        "panNumber": _panController.text.trim(),
-        "aboutText": _aboutBioController.text.trim(),
-        "areasOfExpertise": _areasOfExpertiseController.text.trim(),
-        "awards": _awardsController.text.trim(),
-      };
-
-      await ApiService.registerDoctor(
-        name: payload["name"] as String,
-        email: payload["email"] as String,
-        phone: payload["phone"] as String,
-        gender: payload["gender"] as String,
-        dateOfBirth: payload["dateOfBirth"] as String,
-        specialty: payload["specialty"] as String,
-        subSpecialty: payload["subSpecialty"] as String,
-        qualification: payload["qualification"] as String,
-        collegeName: payload["collegeName"] as String,
-        graduationYear: payload["graduationYear"] as String,
-        postGradDegree: payload["postGradDegree"] as String,
-        postGradCollege: payload["postGradCollege"] as String,
-        postGradYear: payload["postGradYear"] as String,
-        experienceYears: payload["experienceYears"] as int,
-        consultationFee: payload["consultationFee"] as double,
-        videoConsultationFee: payload["videoConsultationFee"] as double,
-        clinicName: payload["clinicName"] as String,
-        clinicAddress: payload["clinicAddress"] as String,
-        city: payload["city"] as String,
-        pincode: payload["pincode"] as String,
-        medicalLicenseNo: payload["medicalLicenseNo"] as String,
-        stateMedicalCouncil: payload["stateMedicalCouncil"] as String,
-        registrationYear: payload["registrationYear"] as String,
-        licenseExpiryYear: payload["licenseExpiryYear"] as String,
-        medicalCouncilCertUrl: payload["medicalCouncilCertUrl"] as String,
-        primaryDegreeCertUrl: payload["primaryDegreeCertUrl"] as String,
-        postGradCertUrl: payload["postGradCertUrl"] as String,
-        idProofUrl: payload["idProofUrl"] as String,
-        clinicAddressProofUrl: payload["clinicAddressProofUrl"] as String,
-        doctorSignatureUrl: payload["doctorSignatureUrl"] as String,
-        imageUrl: payload["imageUrl"] as String,
-        languages: List<String>.from(payload["languages"] as List),
-        aboutText: payload["aboutText"] as String,
-      );
-
-      _generatedRegId =
-          "DOC-${DateTime.now().year}-${(10000 + DateTime.now().millisecond).toString()}";
-
-      if (!mounted) return;
-      setState(() {
-        _isSubmitting = false;
-        _currentStep = 7; // Transition to Success / Pending Screen
-      });
-      _scrollToTop();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-      _showSnack("Submission error: $e");
-    }
-  }
-
-  // -------------------------------------------------------------
-  // DOCUMENT LIGHTBOX & PICKER
-  // -------------------------------------------------------------
-  void _openDocumentLightbox(String title, String url) {
-    showDialog(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(16),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.95),
-            borderRadius: BorderRadius.circular(24),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Colors.white),
-                    onPressed: () => Navigator.of(ctx).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: InteractiveViewer(
-                  maxScale: 4.0,
-                  child: Image.network(
-                    url,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      height: 250,
-                      color: Colors.grey.shade900,
-                      child: const Center(
-                        child: Text(
-                          "Document Preview",
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                "Pinch to zoom in / inspect certificate seals and stamps",
-                style: TextStyle(color: Colors.white54, fontSize: 11),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showDocumentUploadSheet({
-    required String title,
-    required Function(String newUrl) onSelected,
-  }) {
-    final presets = [
-      "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800",
-      "https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?w=800",
-      "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800",
-      "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800",
-      "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=800",
-      "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800",
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Upload $title",
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                "Take a photo of physical document, select from gallery, or choose official preset.",
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.camera_alt_rounded,
-                      color: AppColors.primary),
-                ),
-                title: const Text("Capture with Device Camera",
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                subtitle: const Text("Scan document directly",
-                    style: TextStyle(fontSize: 11.5)),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  onSelected(presets[0]);
-                  _showSnack("Camera document photo captured & attached!",
-                      isError: false);
-                },
-              ),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.photo_library_rounded,
-                      color: Colors.blue),
-                ),
-                title: const Text("Choose from Photo Gallery / Files",
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                subtitle: const Text("Supports JPG, PNG, PDF",
-                    style: TextStyle(fontSize: 11.5)),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  onSelected(presets[1]);
-                  _showSnack("Document attached from device storage!",
-                      isError: false);
-                },
-              ),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.successLight,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.verified_outlined,
-                      color: AppColors.success),
-                ),
-                title: const Text("Use Certified NMC Sample Certificate",
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                subtitle: const Text("High-resolution verified specimen",
-                    style: TextStyle(fontSize: 11.5)),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  onSelected(presets[2]);
-                  _showSnack("Certified document specimen loaded.",
-                      isError: false);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // -------------------------------------------------------------
-  // BUILD METHOD
-  // -------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
-    // Watch specialties dynamically from Admin Provider
-    final specialtiesAsync = ref.watch(specialtiesListProvider);
-    final List<String> adminSpecialties = specialtiesAsync.isNotEmpty
-        ? specialtiesAsync.map((s) => s.name).toList()
-        : [
-            "General Physician",
-            "Cardiologist",
-            "Dermatologist",
-            "Gynecologist",
-            "Pediatrician",
-            "Orthopedic Surgeon",
-            "Neurologist",
-            "ENT Specialist",
-            "Psychiatrist",
-            "Dentist",
-            "Ophthalmologist",
-            "Pulmonologist",
-          ];
-
-    // Ensure selected specialty exists in admin list
-    if (!adminSpecialties.contains(_selectedSpecialty) &&
-        adminSpecialties.isNotEmpty) {
-      _selectedSpecialty = adminSpecialties.first;
-    }
-
     if (_currentStep == 7) {
       return _buildSuccessScreen();
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Doctor Registration",
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            Text(
-              "NMC Telemedicine License Application",
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Colors.blue.shade700,
-              ),
-            ),
-          ],
-        ),
         backgroundColor: Colors.white,
-        elevation: 0.5,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
-          onPressed: () {
-            if (_currentStep > 0) {
-              _prevStep();
-            } else {
-              Navigator.of(context).pop();
-            }
-          },
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textPrimary),
+          onPressed: _previousStep,
         ),
+        title: const Text(
+          'Doctor Registration',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        centerTitle: true,
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: ActionChip(
-              avatar: const Icon(Icons.flash_on_rounded,
-                  color: Colors.amber, size: 16),
-              label: const Text(
-                "⚡ Auto-fill Demo",
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
               ),
-              backgroundColor: Colors.amber.shade50,
-              side: BorderSide(color: Colors.amber.shade200),
-              onPressed: _autoFillDemoProfile,
             ),
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(4),
+          child: LinearProgressIndicator(
+            value: (_currentStep + 1) / 7,
+            backgroundColor: const Color(0xFFE2E8F0),
+            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+            minHeight: 4,
+          ),
+        ),
       ),
       body: SafeArea(
         child: Column(
           children: [
-            // STEP PROGRESS STEPPER AT TOP
-            _buildStepperHeader(),
-
-            // SCROLLABLE CURRENT STEP CONTENT
             Expanded(
               child: SingleChildScrollView(
                 controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
-                child: _buildStepBody(adminSpecialties),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildStepHeader(),
+                      const SizedBox(height: 24),
+                      _buildStepContent(),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
               ),
             ),
-
-            // BOTTOM NAVIGATION BAR
-            _buildBottomBar(),
+            _buildBottomActionBar(),
           ],
         ),
       ),
@@ -904,374 +820,290 @@ class _DoctorRegistrationScreenState
   }
 
   // -------------------------------------------------------------
-  // STEPPER HEADER WIDGET
+  // STEP HEADER
   // -------------------------------------------------------------
-  Widget _buildStepperHeader() {
+  Widget _buildStepHeader() {
     final stepTitles = [
-      "Personal Details",
-      "Medical Degrees",
-      "Registration & Specialty",
-      "Clinic Details",
-      "Fees & Availability",
-      "Documents Vault",
-      "Bank & Profile",
+      'Personal Details',
+      'Medical Qualifications',
+      'Council & Specialty',
+      'Clinic Information',
+      'Consultation & Fees',
+      'Document Vault',
+      'Payout & Verification',
     ];
 
-    final progress = (_currentStep + 1) / 7;
+    final stepSubtitles = [
+      'Enter your personal identification details as registered in medical records.',
+      'Provide your primary and postgraduate medical degree credentials.',
+      'Specify your medical council license and practice specialization.',
+      'Enter your clinic or hospital address and practice modes.',
+      'Define your consultation fees, available days, and slot timing.',
+      'Attach clear photos or PDF copies of your licenses and certificates.',
+      'Provide bank account details for consultation payouts and agree to declarations.',
+    ];
 
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      "STEP ${_currentStep + 1} OF 7",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    stepTitles[_currentStep],
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(6),
               ),
-              Text(
-                "${(progress * 100).toInt()}% Done",
-                style: TextStyle(
-                  fontSize: 11,
+              child: Text(
+                'Step ${_currentStep + 1} of 7',
+                style: const TextStyle(
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w700,
-                  color: Colors.blue.shade700,
+                  color: AppColors.primary,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 5,
-              backgroundColor: Colors.grey.shade200,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
             ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          stepTitles[_currentStep],
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+            letterSpacing: -0.3,
           ),
-          const SizedBox(height: 10),
-          // Horizontal step badges
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: List.generate(7, (idx) {
-                final isDone = idx < _currentStep;
-                final isCurrent = idx == _currentStep;
-
-                return GestureDetector(
-                  onTap: () {
-                    // Only allow jumping back to completed steps
-                    if (idx < _currentStep) {
-                      setState(() => _currentStep = idx);
-                      _scrollToTop();
-                    }
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 6),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isCurrent
-                          ? AppColors.primaryLight
-                          : isDone
-                              ? AppColors.successLight
-                              : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isCurrent
-                            ? AppColors.primary
-                            : isDone
-                                ? AppColors.success.withValues(alpha: 0.5)
-                                : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (isDone)
-                          const Icon(Icons.check_circle_rounded,
-                              size: 13, color: AppColors.success)
-                        else
-                          Text(
-                            "${idx + 1}",
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              color: isCurrent
-                                  ? AppColors.primary
-                                  : Colors.grey.shade600,
-                            ),
-                          ),
-                        const SizedBox(width: 5),
-                        Text(
-                          stepTitles[idx],
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: isCurrent
-                                ? FontWeight.w800
-                                : FontWeight.w600,
-                            color: isCurrent
-                                ? AppColors.primary
-                                : isDone
-                                    ? const Color(0xFF065F46)
-                                    : Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
-            ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          stepSubtitles[_currentStep],
+          style: const TextStyle(
+            fontSize: 13,
+            color: AppColors.textSecondary,
+            height: 1.4,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   // -------------------------------------------------------------
   // STEP CONTENT DISPATCHER
   // -------------------------------------------------------------
-  Widget _buildStepBody(List<String> adminSpecialties) {
+  Widget _buildStepContent() {
     switch (_currentStep) {
       case 0:
-        return _buildStep1BasicInfo();
+        return _buildStep1PersonalInfo();
       case 1:
         return _buildStep2Education();
       case 2:
-        return _buildStep3RegistrationAndSpecialty(adminSpecialties);
+        return _buildStep3Registration();
       case 3:
         return _buildStep4Clinic();
       case 4:
-        return _buildStep5ConsultationDetails();
+        return _buildStep5Consultation();
       case 5:
         return _buildStep6Documents();
       case 6:
-        return _buildStep7BankAndProfile();
+        return _buildStep7BankAndBio();
       default:
-        return _buildStep1BasicInfo();
+        return const SizedBox.shrink();
     }
   }
 
   // -------------------------------------------------------------
-  // STEP 1: BASIC INFORMATION
+  // STEP 1: PERSONAL INFORMATION
   // -------------------------------------------------------------
-  Widget _buildStep1BasicInfo() {
+  Widget _buildStep1PersonalInfo() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(
-          icon: Icons.person_rounded,
-          title: "1. Basic Personal Information",
-          subtitle:
-              "Official doctor legal identity as registered with Medical Council",
-        ),
-        const SizedBox(height: 16),
-
-        // Profile Photo Avatar Card
+        // Real Profile Photo Picker
         Center(
-          child: Column(
+          child: Stack(
             children: [
-              Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 46,
-                    backgroundColor: Colors.blue.shade100,
-                    backgroundImage: NetworkImage(_profilePhotoUrl),
-                    onBackgroundImageError: (context, error) {},
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: GestureDetector(
-                      onTap: () {
-                        _showDocumentUploadSheet(
-                          title: "Doctor Profile Photo",
-                          onSelected: (url) =>
-                              setState(() => _profilePhotoUrl = url),
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: const Icon(Icons.camera_alt_rounded,
-                            size: 16, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                ],
+              GestureDetector(
+                onTap: () => _showDocumentPickerModal('profile_photo', 'Profile Photo'),
+                child: CircleAvatar(
+                  radius: 46,
+                  backgroundColor: const Color(0xFFF1F5F9),
+                  child: _profilePhoto != null
+                      ? ClipOval(
+                          child: _profilePhoto!.fileBytes != null
+                              ? Image.memory(
+                                  _profilePhoto!.fileBytes!,
+                                  width: 92,
+                                  height: 92,
+                                  fit: BoxFit.cover,
+                                )
+                              : (_profilePhoto!.filePath != null
+                                  ? Image.file(
+                                      File(_profilePhoto!.filePath!),
+                                      width: 92,
+                                      height: 92,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : const Icon(Icons.person, size: 48, color: AppColors.textTertiary)),
+                        )
+                      : const Icon(Icons.person_outline_rounded,
+                          size: 46, color: AppColors.textTertiary),
+                ),
               ),
-              const SizedBox(height: 6),
-              const Text(
-                "Doctor Profile Picture (Tap camera to change)",
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: GestureDetector(
+                  onTap: () => _showDocumentPickerModal('profile_photo', 'Profile Photo'),
+                  child: Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
+                  ),
+                ),
               ),
             ],
           ),
         ),
+        const SizedBox(height: 8),
+        Center(
+          child: Text(
+            _profilePhoto != null ? 'Tap to change photo' : 'Upload Professional Photo',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
+          ),
+        ),
+        if (_profilePhoto != null)
+          Center(
+            child: TextButton(
+              onPressed: () => setState(() => _profilePhoto = null),
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+              child: const Text('Remove Photo', style: TextStyle(fontSize: 11, color: AppColors.error)),
+            ),
+          ),
         const SizedBox(height: 20),
 
         _buildTextField(
           controller: _nameController,
-          label: "Full Legal Name (with title) *",
-          hint: "e.g. Dr. Vikramaditya Rathore",
+          label: 'Full Legal Name *',
+          hint: 'e.g. Dr. Rajesh Sharma',
           prefixIcon: Icons.badge_outlined,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
 
-        // Gender Choice Chips
-        const Text(
-          "Gender *",
-          style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 6),
+        _buildLabel('Gender *'),
         Row(
-          children: ["Male", "Female", "Other"].map((g) {
+          children: ['Male', 'Female', 'Other'].map((g) {
             final isSel = _gender == g;
             return Padding(
-              padding: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.only(right: 12),
               child: ChoiceChip(
                 label: Text(g),
                 selected: isSel,
-                selectedColor: AppColors.primary,
-                labelStyle: TextStyle(
-                  color: isSel ? Colors.white : AppColors.textPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
                 onSelected: (_) => setState(() => _gender = g),
+                selectedColor: AppColors.primaryLight,
+                labelStyle: TextStyle(
+                  color: isSel ? AppColors.primary : AppColors.textSecondary,
+                  fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 13,
+                ),
+                backgroundColor: const Color(0xFFF8FAFC),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(color: isSel ? AppColors.primary : const Color(0xFFE2E8F0)),
+                ),
               ),
             );
           }).toList(),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
 
-        // Date of Birth Interactive Picker
-        GestureDetector(
+        _buildLabel('Date of Birth *'),
+        InkWell(
           onTap: () async {
+            final now = DateTime.now();
+            final initial = _dateOfBirth ?? DateTime(now.year - 30, 1, 1);
             final picked = await showDatePicker(
               context: context,
-              initialDate: _dateOfBirth,
+              initialDate: initial,
               firstDate: DateTime(1940),
-              lastDate: DateTime.now().subtract(const Duration(days: 365 * 21)),
+              lastDate: DateTime(now.year - 21, now.month, now.day),
             );
-            if (picked != null) setState(() => _dateOfBirth = picked);
+            if (picked != null) {
+              setState(() => _dateOfBirth = picked);
+            }
           },
+          borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.grey.shade300),
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("Date of Birth *",
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 3),
-                    Text(
-                      "${DateFormat("dd MMMM yyyy").format(_dateOfBirth)} (${DateTime.now().year - _dateOfBirth.year} years)",
-                      style: const TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary),
-                    ),
-                  ],
+                const Icon(Icons.calendar_today_outlined, size: 18, color: AppColors.textTertiary),
+                const SizedBox(width: 10),
+                Text(
+                  _dateOfBirth != null
+                      ? DateFormat('dd MMMM yyyy').format(_dateOfBirth!)
+                      : 'Select Date of Birth',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: _dateOfBirth != null ? AppColors.textPrimary : AppColors.textTertiary,
+                    fontWeight: _dateOfBirth != null ? FontWeight.w600 : FontWeight.normal,
+                  ),
                 ),
-                const Icon(Icons.calendar_month_rounded,
-                    color: AppColors.primary),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
 
         _buildTextField(
           controller: _phoneController,
-          label: "Mobile Number *",
-          hint: "+91 98112 34567",
+          label: 'Mobile Number *',
+          hint: '10-digit mobile number',
           keyboardType: TextInputType.phone,
           prefixIcon: Icons.phone_iphone_rounded,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
 
         _buildTextField(
           controller: _altPhoneController,
-          label: "Alternate Mobile / Clinic Landline",
-          hint: "+91 94140 12345 (Optional)",
+          label: 'Alternate Mobile Number (Optional)',
+          hint: 'Secondary contact number',
           keyboardType: TextInputType.phone,
-          prefixIcon: Icons.call_outlined,
+          prefixIcon: Icons.phone_outlined,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
 
         _buildTextField(
           controller: _emailController,
-          label: "Official Email Address *",
-          hint: "dr.name@medicare.com",
+          label: 'Email Address *',
+          hint: 'doctor.name@hospital.com',
           keyboardType: TextInputType.emailAddress,
-          prefixIcon: Icons.mail_outline_rounded,
+          prefixIcon: Icons.email_outlined,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
 
         _buildTextField(
           controller: _passwordController,
-          label: "Account Password *",
-          hint: "Create secure practitioner password",
+          label: 'Create Password *',
+          hint: 'Minimum 6 characters',
           obscureText: _obscurePassword,
           prefixIcon: Icons.lock_outline_rounded,
           suffixIcon: IconButton(
             icon: Icon(
-              _obscurePassword
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
+              _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
               size: 20,
-              color: Colors.grey,
+              color: AppColors.textTertiary,
             ),
-            onPressed: () =>
-                setState(() => _obscurePassword = !_obscurePassword),
+            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
           ),
         ),
       ],
@@ -1285,366 +1117,165 @@ class _DoctorRegistrationScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(
-          icon: Icons.school_rounded,
-          title: "2. Medical Qualifications & Degrees",
-          subtitle:
-              "Record recognized MBBS graduation and post-graduate medical training",
+        _buildDropdownField<String>(
+          label: 'Primary Medical Qualification *',
+          value: _primaryDegree,
+          items: _primaryDegrees,
+          onChanged: (val) => setState(() => _primaryDegree = val ?? 'MBBS'),
+          prefixIcon: Icons.school_outlined,
         ),
         const SizedBox(height: 16),
 
-        // Primary Degree Container
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.grey.shade200),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.school_outlined,
-                        color: Colors.blue, size: 18),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    "Primary Medical Qualification (Undergraduate)",
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              DropdownButtonFormField<String>(
-                initialValue: _primaryDegree,
-                decoration: _fieldDecoration(
-                  label: "Degree Title *",
-                  prefixIcon: Icons.workspace_premium_outlined,
-                ),
-                items: _primaryDegreeOptions.map((deg) {
-                  return DropdownMenuItem(value: deg, child: Text(deg));
-                }).toList(),
-                onChanged: (val) =>
-                    setState(() => _primaryDegree = val ?? "MBBS"),
-              ),
-              const SizedBox(height: 12),
-
-              _buildTextField(
-                controller: _primaryCollegeController,
-                label: "Medical College / University *",
-                hint: "e.g. SMS Medical College, Jaipur",
-                prefixIcon: Icons.account_balance_outlined,
-              ),
-              const SizedBox(height: 12),
-
-              _buildTextField(
-                controller: _primaryPassingYearController,
-                label: "Year of Passing *",
-                hint: "e.g. 2011",
-                keyboardType: TextInputType.number,
-                prefixIcon: Icons.calendar_today_outlined,
-              ),
-              const SizedBox(height: 14),
-
-              // Upload Primary Degree
-              _buildMiniDocUpload(
-                title: "Primary Degree Certificate (MBBS)",
-                url: _primaryDegreeCertUrl,
-                onTapUpload: () {
-                  _showDocumentUploadSheet(
-                    title: "Primary Degree Certificate",
-                    onSelected: (u) => setState(() => _primaryDegreeCertUrl = u),
-                  );
-                },
-                onTapInspect: () => _openDocumentLightbox(
-                    "Primary Degree Certificate", _primaryDegreeCertUrl),
-              ),
-            ],
-          ),
+        _buildTextField(
+          controller: _primaryCollegeController,
+          label: 'Medical College / University *',
+          hint: 'e.g. SMS Medical College & Hospital, Jaipur',
+          prefixIcon: Icons.apartment_outlined,
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
 
-        // Post-Graduate Degree Container
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.grey.shade200),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.indigo.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.military_tech_outlined,
-                        color: Colors.indigo, size: 18),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    "Post-Graduate Specialization (PG / Higher Degree)",
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              DropdownButtonFormField<String>(
-                initialValue: _postGradDegree,
-                decoration: _fieldDecoration(
-                  label: "PG Degree Title",
-                  prefixIcon: Icons.military_tech_outlined,
-                ),
-                items: _postGradDegreeOptions.map((deg) {
-                  return DropdownMenuItem(value: deg, child: Text(deg));
-                }).toList(),
-                onChanged: (val) => setState(
-                    () => _postGradDegree = val ?? "MD (Internal Medicine)"),
-              ),
-              const SizedBox(height: 12),
-
-              _buildTextField(
-                controller: _postGradCollegeController,
-                label: "PG College / Institute",
-                hint: "e.g. AIIMS New Delhi",
-                prefixIcon: Icons.account_balance_outlined,
-              ),
-              const SizedBox(height: 12),
-
-              _buildTextField(
-                controller: _postGradPassingYearController,
-                label: "PG Passing Year",
-                hint: "e.g. 2015",
-                keyboardType: TextInputType.number,
-                prefixIcon: Icons.calendar_today_outlined,
-              ),
-              const SizedBox(height: 14),
-
-              // Upload PG Certificate
-              _buildMiniDocUpload(
-                title: "Post-Graduate Specialization Certificate",
-                url: _postGradCertUrl,
-                onTapUpload: () {
-                  _showDocumentUploadSheet(
-                    title: "Post-Graduate Degree Certificate",
-                    onSelected: (u) => setState(() => _postGradCertUrl = u),
-                  );
-                },
-                onTapInspect: () => _openDocumentLightbox(
-                    "Post-Graduate Certificate", _postGradCertUrl),
-              ),
-            ],
-          ),
+        _buildTextField(
+          controller: _primaryPassingYearController,
+          label: 'Year of Passing / Graduation *',
+          hint: 'e.g. 2012',
+          keyboardType: TextInputType.number,
+          prefixIcon: Icons.event_available_outlined,
         ),
+        const SizedBox(height: 16),
+
+        _buildDocumentUploadWidget(
+          docKey: 'primary_degree',
+          title: 'Primary Degree Certificate *',
+          subtitle: 'Scanned copy of MBBS / BDS degree diploma',
+          isRequired: true,
+        ),
+        const SizedBox(height: 24),
+        const Divider(color: AppColors.borderLight),
+        const SizedBox(height: 16),
+
+        _buildDropdownField<String>(
+          label: 'Postgraduate Medical Degree / Specialization',
+          value: _postGradDegree,
+          items: _postGradDegrees,
+          onChanged: (val) => setState(() => _postGradDegree = val ?? 'None'),
+          prefixIcon: Icons.workspace_premium_outlined,
+        ),
+
+        if (_postGradDegree != 'None') ...[
+          const SizedBox(height: 16),
+          _buildTextField(
+            controller: _postGradCollegeController,
+            label: 'Postgraduate College / Institution',
+            hint: 'e.g. AIIMS New Delhi',
+            prefixIcon: Icons.apartment_outlined,
+          ),
+          const SizedBox(height: 16),
+          _buildTextField(
+            controller: _postGradPassingYearController,
+            label: 'PG Passing Year',
+            hint: 'e.g. 2016',
+            keyboardType: TextInputType.number,
+            prefixIcon: Icons.event_available_outlined,
+          ),
+          const SizedBox(height: 16),
+          _buildDocumentUploadWidget(
+            docKey: 'post_grad_degree',
+            title: 'Postgraduate Degree Certificate',
+            subtitle: 'Upload MD / MS / DM certificate or fellowship scan',
+            isRequired: false,
+          ),
+        ],
       ],
     );
   }
 
   // -------------------------------------------------------------
-  // STEP 3: REGISTRATION & SPECIALIZATION (FROM ADMIN)
+  // STEP 3: REGISTRATION & SPECIALIZATION
   // -------------------------------------------------------------
-  Widget _buildStep3RegistrationAndSpecialty(List<String> adminSpecialties) {
+  Widget _buildStep3Registration() {
+    final specialtiesList = ref.watch(specialtiesListProvider);
+    final specialtyNames = specialtiesList.map((s) => s.name).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(
-          icon: Icons.badge_rounded,
-          title: "3. State Council & Specialization",
-          subtitle:
-              "Medical licensing authority and practice specialty (configured by Admin)",
+        _buildTextField(
+          controller: _licenseNoController,
+          label: 'Medical Registration / License Number *',
+          hint: 'e.g. RMC/2014/88412 or MCI-77321',
+          prefixIcon: Icons.confirmation_number_outlined,
         ),
         const SizedBox(height: 16),
 
-        _buildTextField(
-          controller: _licenseNoController,
-          label: "Medical Registration / License Number *",
-          hint: "e.g. RMC/2011/77321 or MCI/2011/84920",
-          prefixIcon: Icons.confirmation_number_outlined,
+        _buildDropdownField<String>(
+          label: 'Medical Council Authority *',
+          value: _stateCouncil,
+          items: _stateCouncils,
+          onChanged: (val) => setState(() => _stateCouncil = val ?? _stateCouncils.first),
+          prefixIcon: Icons.verified_user_outlined,
         ),
-        const SizedBox(height: 14),
-
-        DropdownButtonFormField<String>(
-          initialValue: _stateCouncil,
-          isExpanded: true,
-          decoration: _fieldDecoration(
-            label: "Medical Council / Registration Authority *",
-            prefixIcon: Icons.verified_user_outlined,
-          ),
-          items: _indianMedicalCouncils.map((council) {
-            return DropdownMenuItem(
-              value: council,
-              child: Text(council,
-                  style: const TextStyle(fontSize: 13),
-                  overflow: TextOverflow.ellipsis),
-            );
-          }).toList(),
-          onChanged: (val) =>
-              setState(() => _stateCouncil = val ?? _indianMedicalCouncils.first),
-        ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
 
         Row(
           children: [
             Expanded(
               child: _buildTextField(
                 controller: _registrationYearController,
-                label: "Registration Year *",
-                hint: "2011",
+                label: 'Registration Year *',
+                hint: 'e.g. 2014',
                 keyboardType: TextInputType.number,
-                prefixIcon: Icons.event_available_outlined,
+                prefixIcon: Icons.calendar_month_outlined,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildTextField(
                 controller: _expiryYearController,
-                label: "License Valid Till",
-                hint: "2036",
+                label: 'License Valid Till',
+                hint: 'e.g. 2035',
                 keyboardType: TextInputType.number,
                 prefixIcon: Icons.event_busy_outlined,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
 
-        // SPECIALIZATION SELECTION FROM ADMIN
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.blue.shade50.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.blue.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.admin_panel_settings_rounded,
-                      size: 18, color: AppColors.primary),
-                  const SizedBox(width: 6),
-                  const Text(
-                    "Practice Specialization (Live from Admin Portal)",
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                "Select your primary discipline from specialties configured by the hospital admin.",
-                style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 12),
-
-              DropdownButtonFormField<String>(
-                initialValue: _selectedSpecialty,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.white,
-                  labelText: "Primary Specialization *",
-                  labelStyle: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary),
-                  prefixIcon:
-                      const Icon(Icons.medical_information_rounded, size: 20),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.blue.shade300),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.blue.shade200),
-                  ),
-                ),
-                items: adminSpecialties.map((spec) {
-                  return DropdownMenuItem(
-                    value: spec,
-                    child: Text(
-                      spec,
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedSpecialty = val);
-                },
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-
-        _buildTextField(
-          controller: _subSpecialtyController,
-          label: "Sub-Specialization / Clinical Interest",
-          hint: "e.g. Interventional Cardiology, Pediatric Asthma",
-          prefixIcon: Icons.healing_outlined,
-        ),
-        const SizedBox(height: 14),
-
-        _buildTextField(
-          controller: _experienceYearsController,
-          label: "Total Years of Clinical Experience *",
-          hint: "e.g. 12",
-          keyboardType: TextInputType.number,
-          prefixIcon: Icons.work_history_outlined,
+        // Live Specialties from Admin
+        _buildLabel('Practice Specialization (From Hospital Directory) *'),
+        DropdownButtonFormField<String>(
+          initialValue: _selectedSpecialty,
+          isExpanded: true,
+          hint: const Text('Select Specialization', style: TextStyle(fontSize: 13.5, color: AppColors.textTertiary)),
+          decoration: _inputDecoration(prefixIcon: Icons.medical_services_outlined),
+          items: specialtyNames.map((name) {
+            return DropdownMenuItem(
+              value: name,
+              child: Text(name, style: const TextStyle(fontSize: 13.5)),
+            );
+          }).toList(),
+          onChanged: (val) => setState(() => _selectedSpecialty = val),
         ),
         const SizedBox(height: 16),
 
-        // Languages Spoken Chips
-        const Text(
-          "Languages Spoken with Patients *",
-          style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary),
+        _buildTextField(
+          controller: _subSpecialtyController,
+          label: 'Sub-specialization / Clinical Focus',
+          hint: 'e.g. Interventional Cardiology, Pediatric Asthma',
+          prefixIcon: Icons.medication_outlined,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
+
+        _buildTextField(
+          controller: _experienceYearsController,
+          label: 'Years of Clinical Practice Experience *',
+          hint: 'e.g. 10',
+          keyboardType: TextInputType.number,
+          prefixIcon: Icons.timeline_outlined,
+        ),
+        const SizedBox(height: 16),
+
+        _buildLabel('Consultation Languages Spoken *'),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -1653,13 +1284,6 @@ class _DoctorRegistrationScreenState
             return FilterChip(
               label: Text(lang),
               selected: isSel,
-              selectedColor: AppColors.primaryLight,
-              checkmarkColor: AppColors.primary,
-              labelStyle: TextStyle(
-                color: isSel ? AppColors.primary : AppColors.textPrimary,
-                fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
-                fontSize: 11.5,
-              ),
               onSelected: (val) {
                 setState(() {
                   if (val) {
@@ -1671,6 +1295,17 @@ class _DoctorRegistrationScreenState
                   }
                 });
               },
+              selectedColor: AppColors.primaryLight,
+              labelStyle: TextStyle(
+                color: isSel ? AppColors.primary : AppColors.textSecondary,
+                fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 12.5,
+              ),
+              backgroundColor: const Color(0xFFF8FAFC),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: isSel ? AppColors.primary : const Color(0xFFE2E8F0)),
+              ),
             );
           }).toList(),
         ),
@@ -1685,143 +1320,110 @@ class _DoctorRegistrationScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(
-          icon: Icons.apartment_rounded,
-          title: "4. Clinic & Hospital Practice Information",
-          subtitle:
-              "Physical clinic premises, hospital affiliations, and consultation format",
+        _buildTextField(
+          controller: _clinicNameController,
+          label: 'Clinic / Hospital Practice Name *',
+          hint: 'e.g. City Health Clinic / Manipal Hospital',
+          prefixIcon: Icons.apartment_rounded,
         ),
         const SizedBox(height: 16),
 
         _buildTextField(
-          controller: _clinicNameController,
-          label: "Clinic / Hospital Name *",
-          hint: "e.g. Rathore Heart Care & Wellness Clinic",
-          prefixIcon: Icons.apartment_rounded,
-        ),
-        const SizedBox(height: 14),
-
-        _buildTextField(
           controller: _clinicAddressController,
-          label: "Clinic Street Address *",
-          hint: "Plot 12, JLN Marg, Near World Trade Park",
-          maxLines: 2,
+          label: 'Street Address & Building Details *',
+          hint: 'e.g. Suite 204, Metro Plaza, JLN Marg',
           prefixIcon: Icons.location_on_outlined,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
 
         Row(
           children: [
             Expanded(
               child: _buildTextField(
                 controller: _cityController,
-                label: "City *",
-                hint: "e.g. Jaipur",
+                label: 'City *',
+                hint: 'e.g. Jaipur',
                 prefixIcon: Icons.location_city_outlined,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildTextField(
-                controller: _pincodeController,
-                label: "Pincode *",
-                hint: "302018",
-                keyboardType: TextInputType.number,
-                prefixIcon: Icons.pin_drop_outlined,
+                controller: _stateController,
+                label: 'State *',
+                hint: 'e.g. Rajasthan',
+                prefixIcon: Icons.map_outlined,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 14),
-
-        _buildTextField(
-          controller: _landmarkController,
-          label: "Google Map Landmark / Location Tag",
-          hint: "Opposite Gaurav Tower, Malviya Nagar",
-          prefixIcon: Icons.map_outlined,
-        ),
-        const SizedBox(height: 18),
-
-        // Consultation Type Cards
-        const Text(
-          "Consultation Mode Offered *",
-          style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
 
         Row(
           children: [
-            _buildConsultTypeCard(
-              id: "in_person",
-              title: "In-Person",
-              subtitle: "Clinic visit only",
-              icon: Icons.storefront_rounded,
+            Expanded(
+              child: _buildTextField(
+                controller: _pincodeController,
+                label: 'PIN Code *',
+                hint: 'e.g. 302018',
+                keyboardType: TextInputType.number,
+                prefixIcon: Icons.pin_drop_outlined,
+              ),
             ),
-            const SizedBox(width: 8),
-            _buildConsultTypeCard(
-              id: "video",
-              title: "Video Call",
-              subtitle: "Telemedicine only",
-              icon: Icons.videocam_rounded,
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildTextField(
+                controller: _landmarkController,
+                label: 'Landmark (Optional)',
+                hint: 'Near Metro Station',
+                prefixIcon: Icons.near_me_outlined,
+              ),
             ),
-            const SizedBox(width: 8),
-            _buildConsultTypeCard(
-              id: "both",
-              title: "Both Modes",
-              subtitle: "In-person + Video",
-              icon: Icons.health_and_safety_rounded,
-            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        _buildLabel('Practice Consultation Mode *'),
+        Row(
+          children: [
+            _buildConsultTypeOption('in_person', 'In-Person', Icons.apartment_outlined),
+            const SizedBox(width: 10),
+            _buildConsultTypeOption('video', 'Video Call', Icons.videocam_outlined),
+            const SizedBox(width: 10),
+            _buildConsultTypeOption('both', 'Both Hybrid', Icons.sync_alt_rounded),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildConsultTypeCard({
-    required String id,
-    required String title,
-    required String subtitle,
-    required IconData icon,
-  }) {
+  Widget _buildConsultTypeOption(String id, String label, IconData icon) {
     final isSel = _consultationType == id;
     return Expanded(
-      child: GestureDetector(
+      child: InkWell(
         onTap: () => setState(() => _consultationType = id),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: isSel ? AppColors.primaryLight : Colors.white,
-            borderRadius: BorderRadius.circular(14),
+            color: isSel ? AppColors.primaryLight : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isSel ? AppColors.primary : Colors.grey.shade300,
+              color: isSel ? AppColors.primary : const Color(0xFFE2E8F0),
               width: isSel ? 1.5 : 1,
             ),
           ),
           child: Column(
             children: [
-              Icon(icon,
-                  size: 22,
-                  color: isSel ? AppColors.primary : Colors.grey.shade700),
+              Icon(icon, size: 22, color: isSel ? AppColors.primary : AppColors.textSecondary),
               const SizedBox(height: 6),
               Text(
-                title,
+                label,
                 style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 12.5,
+                  fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
                   color: isSel ? AppColors.primary : AppColors.textPrimary,
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 9.5,
-                  color: isSel ? AppColors.primary : AppColors.textSecondary,
-                ),
-                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -1831,27 +1433,19 @@ class _DoctorRegistrationScreenState
   }
 
   // -------------------------------------------------------------
-  // STEP 5: CONSULTATION DETAILS & AVAILABILITY
+  // STEP 5: CONSULTATION SCHEDULE & FEES
   // -------------------------------------------------------------
-  Widget _buildStep5ConsultationDetails() {
+  Widget _buildStep5Consultation() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(
-          icon: Icons.schedule_rounded,
-          title: "5. Consultation Fees & Weekly Schedule",
-          subtitle:
-              "Set your professional pricing, appointment duration, and active slots",
-        ),
-        const SizedBox(height: 16),
-
         Row(
           children: [
             Expanded(
               child: _buildTextField(
                 controller: _inPersonFeeController,
-                label: "In-Person Fee (₹) *",
-                hint: "800",
+                label: 'In-Person Fee (₹) *',
+                hint: 'e.g. 600',
                 keyboardType: TextInputType.number,
                 prefixIcon: Icons.currency_rupee_rounded,
               ),
@@ -1860,78 +1454,60 @@ class _DoctorRegistrationScreenState
             Expanded(
               child: _buildTextField(
                 controller: _videoFeeController,
-                label: "Video Call Fee (₹) *",
-                hint: "650",
+                label: 'Video Call Fee (₹) *',
+                hint: 'e.g. 500',
                 keyboardType: TextInputType.number,
-                prefixIcon: Icons.videocam_outlined,
+                prefixIcon: Icons.currency_rupee_rounded,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
 
         _buildTextField(
           controller: _followUpFeeController,
-          label: "Follow-up Consultation Fee (₹)",
-          hint: "400 (Within 7 days)",
+          label: 'Follow-Up Review Fee (₹)',
+          hint: 'e.g. 300 (or 0 for complimentary)',
           keyboardType: TextInputType.number,
-          prefixIcon: Icons.replay_rounded,
+          prefixIcon: Icons.currency_rupee_rounded,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
 
-        // Slot Duration Chips
-        const Text(
-          "Average Consultation Duration *",
-          style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 8),
+        _buildLabel('Average Appointment Duration *'),
         Row(
-          children: ["15 mins", "20 mins", "30 mins", "45 mins"].map((dur) {
+          children: ['15 mins', '20 mins', '30 mins', '45 mins'].map((dur) {
             final isSel = _slotDuration == dur;
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: ChoiceChip(
                 label: Text(dur),
                 selected: isSel,
-                selectedColor: AppColors.primary,
-                labelStyle: TextStyle(
-                  color: isSel ? Colors.white : AppColors.textPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11.5,
-                ),
                 onSelected: (_) => setState(() => _slotDuration = dur),
+                selectedColor: AppColors.primaryLight,
+                labelStyle: TextStyle(
+                  color: isSel ? AppColors.primary : AppColors.textSecondary,
+                  fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 12.5,
+                ),
+                backgroundColor: const Color(0xFFF8FAFC),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(color: isSel ? AppColors.primary : const Color(0xFFE2E8F0)),
+                ),
               ),
             );
           }).toList(),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
 
-        // Available Days
-        const Text(
-          "Available Practice Days *",
-          style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 8),
+        _buildLabel('Weekly Available Days *'),
         Wrap(
           spacing: 8,
-          children: _dayOptions.map((day) {
+          children: _daysList.map((day) {
             final isSel = _availableDays.contains(day);
             return FilterChip(
               label: Text(day),
               selected: isSel,
-              selectedColor: AppColors.primaryLight,
-              checkmarkColor: AppColors.primary,
-              labelStyle: TextStyle(
-                color: isSel ? AppColors.primary : AppColors.textPrimary,
-                fontWeight: isSel ? FontWeight.w800 : FontWeight.w500,
-                fontSize: 12,
-              ),
               onSelected: (val) {
                 setState(() {
                   if (val) {
@@ -1941,49 +1517,63 @@ class _DoctorRegistrationScreenState
                   }
                 });
               },
+              selectedColor: AppColors.primaryLight,
+              labelStyle: TextStyle(
+                color: isSel ? AppColors.primary : AppColors.textSecondary,
+                fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 12.5,
+              ),
+              backgroundColor: const Color(0xFFF8FAFC),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: isSel ? AppColors.primary : const Color(0xFFE2E8F0)),
+              ),
             );
           }).toList(),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
 
-        // Emergency Consultation Switch
+        _buildLabel('Preferred Consulting Time Slots *'),
+        Column(
+          children: _timeSlotOptions.map((slot) {
+            final isSel = _availableTimeSlots.contains(slot);
+            return CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              activeColor: AppColors.primary,
+              title: Text(slot, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              value: isSel,
+              onChanged: (val) {
+                setState(() {
+                  if (val == true) {
+                    _availableTimeSlots.add(slot);
+                  } else {
+                    if (_availableTimeSlots.length > 1) _availableTimeSlots.remove(slot);
+                  }
+                });
+              },
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.grey.shade300),
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.emergency_rounded,
-                        color: Colors.red, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        "Emergency Consultations",
-                        style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w800),
-                      ),
-                      Text(
-                        "Accept urgent on-demand calls",
-                        style: TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary),
-                      ),
-                    ],
-                  ),
+                  Text('Urgent On-Demand Tele-consults',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text('Accept instant calls when online',
+                      style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
                 ],
               ),
               Switch(
@@ -1999,743 +1589,469 @@ class _DoctorRegistrationScreenState
   }
 
   // -------------------------------------------------------------
-  // STEP 6: DOCUMENTS & VERIFICATION UPLOADS
+  // STEP 6: DOCUMENT VAULT
   // -------------------------------------------------------------
   Widget _buildStep6Documents() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(
-          icon: Icons.folder_shared_rounded,
-          title: "6. Required Documents & Verification Vault",
-          subtitle:
-              "Upload clear photocopies of certificates for National Medical Commission (NMC) verification",
+        _buildDocumentUploadWidget(
+          docKey: 'council_cert',
+          title: 'State Medical Council Certificate *',
+          subtitle: 'Scanned certificate showing valid registration number',
+          isRequired: true,
         ),
         const SizedBox(height: 16),
 
-        // 1. Council Cert
-        _buildDocUploadCard(
-          number: "1",
-          title: "State Medical Council / NMC Registration Certificate *",
-          subtitle:
-              "Official license proving active registration with State Council",
-          url: _medicalCouncilCertUrl,
-          onUpload: () => _showDocumentUploadSheet(
-            title: "Medical Council Certificate",
-            onSelected: (u) => setState(() => _medicalCouncilCertUrl = u),
-          ),
-          onInspect: () => _openDocumentLightbox(
-              "Medical Council Registration Certificate",
-              _medicalCouncilCertUrl),
+        _buildDocumentUploadWidget(
+          docKey: 'govt_id',
+          title: 'Government Photo ID Proof *',
+          subtitle: 'Aadhaar Card, Passport, or Voter ID',
+          isRequired: true,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
 
-        // 2. Primary Degree
-        _buildDocUploadCard(
-          number: "2",
-          title: "Primary Medical Degree Certificate (MBBS) *",
-          subtitle: "Graduation degree awarded by approved medical university",
-          url: _primaryDegreeCertUrl,
-          onUpload: () => _showDocumentUploadSheet(
-            title: "MBBS Degree Certificate",
-            onSelected: (u) => setState(() => _primaryDegreeCertUrl = u),
-          ),
-          onInspect: () => _openDocumentLightbox(
-              "Primary Degree Certificate (MBBS)", _primaryDegreeCertUrl),
+        _buildDocumentUploadWidget(
+          docKey: 'clinic_proof',
+          title: 'Clinic Establishment / Address Proof *',
+          subtitle: 'Clinic registration, utility bill, or rent deed',
+          isRequired: true,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
 
-        // 3. Post Grad Degree
-        _buildDocUploadCard(
-          number: "3",
-          title: "Post-Graduate Degree / Specialization Certificate",
-          subtitle: "MD / MS / DNB / DM Higher Medical Qualification proof",
-          url: _postGradCertUrl,
-          onUpload: () => _showDocumentUploadSheet(
-            title: "Post-Graduate Degree Certificate",
-            onSelected: (u) => setState(() => _postGradCertUrl = u),
-          ),
-          onInspect: () => _openDocumentLightbox(
-              "Post-Graduate Specialization Certificate", _postGradCertUrl),
-        ),
-        const SizedBox(height: 12),
-
-        // 4. Govt ID
-        _buildDocUploadCard(
-          number: "4",
-          title: "Government Photo ID Proof *",
-          subtitle: "Aadhaar Card, Passport, or Voter ID matching doctor name",
-          url: _idProofUrl,
-          onUpload: () => _showDocumentUploadSheet(
-            title: "Government Identity Proof",
-            onSelected: (u) => setState(() => _idProofUrl = u),
-          ),
-          onInspect: () => _openDocumentLightbox(
-              "Government Photo ID Proof", _idProofUrl),
-        ),
-        const SizedBox(height: 12),
-
-        // 5. Clinic Proof
-        _buildDocUploadCard(
-          number: "5",
-          title: "Clinic / Hospital Establishment & Address Proof",
-          subtitle:
-              "Clinical establishment license, utility bill, or hospital empanelment",
-          url: _clinicProofUrl,
-          onUpload: () => _showDocumentUploadSheet(
-            title: "Clinic / Hospital Proof",
-            onSelected: (u) => setState(() => _clinicProofUrl = u),
-          ),
-          onInspect: () => _openDocumentLightbox(
-              "Clinic Establishment & Address Proof", _clinicProofUrl),
-        ),
-        const SizedBox(height: 12),
-
-        // 6. Doctor Signature
-        _buildDocUploadCard(
-          number: "6",
-          title: "Doctor Official Signature & Stamp Specimen *",
-          subtitle:
-              "Clear specimen used to sign digital e-prescriptions after calls",
-          url: _signatureUrl,
-          onUpload: () => _showDocumentUploadSheet(
-            title: "Doctor Official Signature & Stamp",
-            onSelected: (u) => setState(() => _signatureUrl = u),
-          ),
-          onInspect: () => _openDocumentLightbox(
-              "Official Signature & Stamp Specimen", _signatureUrl),
+        _buildDocumentUploadWidget(
+          docKey: 'signature',
+          title: 'Doctor Signature & Stamp Specimen *',
+          subtitle: 'Required to digitally sign official tele-prescriptions',
+          isRequired: true,
         ),
       ],
     );
   }
 
-  Widget _buildDocUploadCard({
-    required String number,
-    required String title,
-    required String subtitle,
-    required String url,
-    required VoidCallback onUpload,
-    required VoidCallback onInspect,
-  }) {
-    final hasDoc = url.isNotEmpty;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: hasDoc ? const Color(0xFFA7F3D0) : Colors.amber.shade200,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 12,
-                backgroundColor: hasDoc
-                    ? AppColors.successLight
-                    : Colors.amber.shade100,
-                child: Text(
-                  number,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    color: hasDoc
-                        ? const Color(0xFF065F46)
-                        : Colors.amber.shade800,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: hasDoc
-                      ? AppColors.successLight
-                      : Colors.amber.shade50,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  hasDoc ? "Attached" : "Required",
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: hasDoc
-                        ? const Color(0xFF065F46)
-                        : Colors.amber.shade800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Thumbnail Row & Action Buttons
-          Row(
-            children: [
-              GestureDetector(
-                onTap: onInspect,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    width: 72,
-                    height: 48,
-                    color: Colors.grey.shade100,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.network(
-                          url,
-                          fit: BoxFit.cover,
-                          errorBuilder: (c, e, s) => const Icon(
-                              Icons.description_outlined,
-                              color: Colors.grey),
-                        ),
-                        Container(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          child: const Center(
-                            child: Icon(Icons.zoom_in_rounded,
-                                color: Colors.white, size: 20),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.zoom_in_rounded, size: 16),
-                        label: const Text("Inspect & Zoom",
-                            style: TextStyle(
-                                fontSize: 11, fontWeight: FontWeight.w700)),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        onPressed: onInspect,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.upload_rounded,
-                            size: 16, color: Colors.white),
-                        label: const Text("Change",
-                            style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        onPressed: onUpload,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniDocUpload({
-    required String title,
-    required String url,
-    required VoidCallback onTapUpload,
-    required VoidCallback onTapInspect,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: SizedBox(
-              width: 44,
-              height: 44,
-              child: Image.network(
-                url,
-                fit: BoxFit.cover,
-                errorBuilder: (c, e, s) =>
-                    const Icon(Icons.description, color: Colors.grey),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w700),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const Text("Certificate Attached (Tap inspect to verify)",
-                    style: TextStyle(fontSize: 10, color: AppColors.success)),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.zoom_in_rounded,
-                color: AppColors.primary, size: 20),
-            onPressed: onTapInspect,
-            tooltip: "Inspect Certificate",
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined,
-                color: Colors.grey, size: 20),
-            onPressed: onTapUpload,
-            tooltip: "Replace File",
-          ),
-        ],
-      ),
-    );
-  }
-
   // -------------------------------------------------------------
-  // STEP 7: BANK DETAILS, PROFILE BIO & UNDERTAKINGS
+  // STEP 7: BANK ACCOUNT & BIO
   // -------------------------------------------------------------
-  Widget _buildStep7BankAndProfile() {
+  Widget _buildStep7BankAndBio() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(
-          icon: Icons.account_balance_rounded,
-          title: "7. Bank Payout Details & Profile Bio",
-          subtitle:
-              "Bank details for patient consultation fees payout and public doctor bio",
+        _buildTextField(
+          controller: _accountHolderController,
+          label: 'Bank Account Holder Name *',
+          hint: 'Name as registered with your bank',
+          prefixIcon: Icons.person_outline_rounded,
         ),
         const SizedBox(height: 16),
 
-        // Bank Container
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Direct Bank Transfer Details for Consultation Payouts",
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 12),
+        _buildTextField(
+          controller: _bankNameController,
+          label: 'Bank Name *',
+          hint: 'e.g. HDFC Bank, State Bank of India',
+          prefixIcon: Icons.account_balance_outlined,
+        ),
+        const SizedBox(height: 16),
 
-              _buildTextField(
-                controller: _accountHolderController,
-                label: "Account Holder Name *",
-                hint: "As printed on bank passbook",
-                prefixIcon: Icons.person_pin_outlined,
-              ),
-              const SizedBox(height: 12),
-
-              _buildTextField(
-                controller: _bankNameController,
-                label: "Bank Name *",
-                hint: "e.g. HDFC Bank, SBI, ICICI Bank",
-                prefixIcon: Icons.account_balance_outlined,
-              ),
-              const SizedBox(height: 12),
-
-              _buildTextField(
+        Row(
+          children: [
+            Expanded(
+              child: _buildTextField(
                 controller: _accountNoController,
-                label: "Bank Account Number *",
-                hint: "e.g. 50100492817263",
+                label: 'Account Number *',
+                hint: 'Enter account number',
                 keyboardType: TextInputType.number,
+                obscureText: true,
                 prefixIcon: Icons.credit_card_outlined,
               ),
-              const SizedBox(height: 12),
-
-              _buildTextField(
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildTextField(
                 controller: _confirmAccountNoController,
-                label: "Confirm Bank Account Number *",
-                hint: "Re-enter account number",
+                label: 'Confirm Account No. *',
+                hint: 'Re-enter account number',
                 keyboardType: TextInputType.number,
                 prefixIcon: Icons.credit_card_outlined,
               ),
-              const SizedBox(height: 12),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _ifscController,
-                      label: "IFSC Code *",
-                      hint: "HDFC0001234",
-                      prefixIcon: Icons.domain_outlined,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _panController,
-                      label: "PAN Number *",
-                      hint: "ABCDE1234F",
-                      prefixIcon: Icons.badge_outlined,
-                    ),
-                  ),
-                ],
+        Row(
+          children: [
+            Expanded(
+              child: _buildTextField(
+                controller: _ifscController,
+                label: 'IFSC Code *',
+                hint: 'e.g. HDFC0001234',
+                prefixIcon: Icons.tag_outlined,
               ),
-              const SizedBox(height: 12),
-
-              _buildTextField(
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildTextField(
                 controller: _upiIdController,
-                label: "UPI ID for Instant Payouts",
-                hint: "doctor@okhdfcbank (Optional)",
-                prefixIcon: Icons.qr_code_rounded,
+                label: 'UPI ID (Optional)',
+                hint: 'e.g. name@okhdfcbank',
+                prefixIcon: Icons.alternate_email_rounded,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
 
-        // Doctor Profile & Bio
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Public Doctor Profile Bio & Expertise",
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              _buildTextField(
-                controller: _aboutBioController,
-                label: "About Doctor / Professional Clinical Bio *",
-                hint: "Describe your medical philosophy and clinical background...",
-                maxLines: 4,
-                prefixIcon: Icons.history_edu_outlined,
-              ),
-              const SizedBox(height: 12),
-
-              _buildTextField(
-                controller: _areasOfExpertiseController,
-                label: "Key Areas of Medical Expertise",
-                hint: "e.g. Coronary Angiography, Echo, Heart Failure",
-                prefixIcon: Icons.stars_outlined,
-              ),
-              const SizedBox(height: 12),
-
-              _buildTextField(
-                controller: _awardsController,
-                label: "Awards & Honors (Optional)",
-                hint: "e.g. Best Physician Award 2021",
-                prefixIcon: Icons.emoji_events_outlined,
-              ),
-            ],
-          ),
+        _buildTextField(
+          controller: _panController,
+          label: 'PAN Card Number *',
+          hint: 'e.g. ABCDE1234F',
+          prefixIcon: Icons.badge_outlined,
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
 
-        // Legal Declarations
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.amber.shade50.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.amber.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.gavel_rounded,
-                      color: Colors.amber, size: 20),
-                  const SizedBox(width: 8),
-                  const Text(
-                    "NMC Medical Compliance Declarations",
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
+        _buildTextField(
+          controller: _aboutBioController,
+          label: 'Professional Profile Summary / Bio',
+          hint: 'Brief overview of your clinical expertise and treatment philosophy...',
+          maxLines: 4,
+          prefixIcon: Icons.description_outlined,
+        ),
+        const SizedBox(height: 20),
 
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                value: _agreeCodeOfConduct,
-                activeColor: AppColors.primary,
-                title: const Text(
-                  "I affirm adherence to the National Medical Commission (NMC) Code of Medical Conduct (2002/2023).",
-                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
-                ),
-                onChanged: (v) =>
-                    setState(() => _agreeCodeOfConduct = v ?? false),
-              ),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                value: _agreeTelemedicineGuidelines,
-                activeColor: AppColors.primary,
-                title: const Text(
-                  "I agree to follow the Indian Telemedicine Practice Guidelines (2020) and affirm that all uploaded certificates are authentic copies.",
-                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
-                ),
-                onChanged: (v) =>
-                    setState(() => _agreeTelemedicineGuidelines = v ?? false),
-              ),
-            ],
+        // Declarations
+        const Divider(color: AppColors.borderLight),
+        const SizedBox(height: 12),
+
+        CheckboxListTile(
+          value: _agreeCodeOfConduct,
+          activeColor: AppColors.primary,
+          contentPadding: EdgeInsets.zero,
+          title: const Text(
+            'I affirm compliance with the National Medical Commission (NMC) Code of Medical Ethics and certify all uploaded credentials are valid.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.35),
           ),
+          onChanged: (val) => setState(() => _agreeCodeOfConduct = val ?? false),
+        ),
+
+        CheckboxListTile(
+          value: _agreeTelemedicineGuidelines,
+          activeColor: AppColors.primary,
+          contentPadding: EdgeInsets.zero,
+          title: const Text(
+            'I agree to practice within the Indian Telemedicine Practice Guidelines (2020) and issue digital prescriptions following standard medical protocols.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.35),
+          ),
+          onChanged: (val) => setState(() => _agreeTelemedicineGuidelines = val ?? false),
         ),
       ],
     );
   }
 
   // -------------------------------------------------------------
-  // SUCCESS / PENDING AUDIT SCREEN (STEP 8)
+  // STEP 8: SUBMISSION SUCCESS SCREEN
   // -------------------------------------------------------------
   Widget _buildSuccessScreen() {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const Spacer(),
-
-              // Animated Shield Icon
               Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: AppColors.successLight,
+                width: 76,
+                height: 76,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFDCFCE7),
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFA7F3D0), width: 2),
                 ),
                 child: const Center(
-                  child: Icon(
-                    Icons.verified_user_rounded,
-                    color: AppColors.success,
-                    size: 54,
-                  ),
+                  child: Icon(Icons.check_rounded, color: Color(0xFF16A34A), size: 42),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
               const Text(
-                "Registration Submitted!",
+                'Application Submitted',
                 style: TextStyle(
                   fontSize: 22,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary,
+                  letterSpacing: -0.4,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
+
               Text(
-                "Welcome, ${_nameController.text}",
-                style: TextStyle(
+                'Reference ID: $_generatedRegId',
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: Colors.blue.shade700,
+                  color: AppColors.primary,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-              // Status Card
+              const Text(
+                'Your medical credentials, licenses, and document proofs have been received by the MediCare+ Credentialing Committee.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13.5, color: AppColors.textSecondary, height: 1.4),
+              ),
+              const SizedBox(height: 24),
+
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.amber.shade200),
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
                 child: Column(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "AUDIT STATUS:",
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.amber,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.shade600,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            "Pending Admin Verification",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text("Registration Ref ID:",
-                            style: TextStyle(
-                                fontSize: 12, color: AppColors.textSecondary)),
-                        Text(
-                          _generatedRegId,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textPrimary,
-                            fontFamily: "monospace",
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text("License Number:",
-                            style: TextStyle(
-                                fontSize: 12, color: AppColors.textSecondary)),
-                        Text(
-                          _licenseNoController.text,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                            fontFamily: "monospace",
-                          ),
-                        ),
-                      ],
-                    ),
+                    _buildSummaryRow('Applicant', _nameController.text.trim()),
+                    const Divider(height: 16, color: AppColors.borderLight),
+                    _buildSummaryRow('Specialization', _selectedSpecialty ?? 'Specialist'),
+                    const Divider(height: 16, color: AppColors.borderLight),
+                    _buildSummaryRow('Documents Attached', '${_uploadedDocs.length} Verified Files'),
+                    const Divider(height: 16, color: AppColors.borderLight),
+                    _buildSummaryRow('Review Status', 'Under Audit (24-48 hrs)'),
                   ],
                 ),
-              ),
-              const SizedBox(height: 16),
-
-              const Text(
-                "Our medical compliance team will audit your State Council credentials and 6 attached verification certificates within 2-4 hours. You can inspect your dashboard now.",
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                textAlign: TextAlign.center,
               ),
 
               const Spacer(),
 
-              ElevatedButton.icon(
-                icon: const Icon(Icons.dashboard_rounded, color: Colors.white),
-                label: const Text(
-                  "Go to Doctor Dashboard",
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      AppRoutes.login,
+                      (route) => false,
+                    );
+                  },
+                  child: const Text(
+                    'Return to Login',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  minimumSize: const Size.fromHeight(50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.of(context).pushNamedAndRemoveUntil(
-                    AppRoutes.doctorDashboard,
-                    (route) => false,
-                  );
-                },
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pushNamedAndRemoveUntil(
-                    AppRoutes.login,
-                    (route) => false,
-                  );
-                },
-                child: const Text("Return to Login"),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      AppRoutes.doctorDashboard,
+                      (route) => false,
+                    );
+                  },
+                  child: const Text(
+                    'Open Doctor Dashboard (Preview Mode)',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  ),
+                ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+        ),
+      ],
+    );
+  }
+
+  // -------------------------------------------------------------
+  // REUSABLE DOCUMENT UPLOAD CARD
+  // -------------------------------------------------------------
+  Widget _buildDocumentUploadWidget({
+    required String docKey,
+    required String title,
+    required String subtitle,
+    required bool isRequired,
+  }) {
+    final doc = _uploadedDocs[docKey];
+    final hasDoc = doc != null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: hasDoc ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+          width: hasDoc ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: hasDoc ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    hasDoc ? Icons.check_circle_outline_rounded : Icons.description_outlined,
+                    color: hasDoc ? const Color(0xFF16A34A) : AppColors.textSecondary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          if (hasDoc) ...[
+            const Divider(height: 1, color: AppColors.borderLight),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => _showDocumentPreview(doc, title),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(7),
+                        child: doc.isPdf
+                            ? const Center(
+                                child: Icon(Icons.picture_as_pdf_rounded,
+                                    color: Color(0xFFDC2626), size: 22),
+                              )
+                            : (doc.fileBytes != null
+                                ? Image.memory(doc.fileBytes!, fit: BoxFit.cover)
+                                : (doc.filePath != null
+                                    ? Image.file(File(doc.filePath!), fit: BoxFit.cover)
+                                    : const Icon(Icons.insert_drive_file, size: 20))),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          doc.fileName,
+                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          '${doc.formattedSize} • Ready for audit',
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF16A34A)),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // View Button
+                  IconButton(
+                    icon: const Icon(Icons.visibility_outlined, size: 19, color: AppColors.primary),
+                    tooltip: 'View File',
+                    onPressed: () => _showDocumentPreview(doc, title),
+                  ),
+
+                  // Replace Button
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 19, color: AppColors.textSecondary),
+                    tooltip: 'Change File',
+                    onPressed: () => _showDocumentPickerModal(docKey, title),
+                  ),
+
+                  // Delete Button
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, size: 19, color: AppColors.error),
+                    tooltip: 'Remove File',
+                    onPressed: () {
+                      setState(() => _uploadedDocs.remove(docKey));
+                      _showSnack('Document removed');
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                  ),
+                  icon: const Icon(Icons.cloud_upload_outlined, size: 18, color: AppColors.primary),
+                  label: const Text(
+                    'Attach Document',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary),
+                  ),
+                  onPressed: () => _showDocumentPickerModal(docKey, title),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -2743,78 +2059,60 @@ class _DoctorRegistrationScreenState
   // -------------------------------------------------------------
   // BOTTOM NAVIGATION BAR
   // -------------------------------------------------------------
-  Widget _buildBottomBar() {
+  Widget _buildBottomActionBar() {
     final isLast = _currentStep == 6;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      decoration: BoxDecoration(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, -3),
-          ),
-        ],
+        border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
       ),
       child: Row(
         children: [
-          if (_currentStep > 0)
-            Expanded(
-              flex: 1,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                label: const Text("Back",
-                    style:
-                        TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+          if (_currentStep > 0) ...[
+            SizedBox(
+              height: 48,
+              width: 100,
+              child: OutlinedButton(
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                onPressed: _prevStep,
+                onPressed: _previousStep,
+                child: const Text(
+                  'Back',
+                  style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                ),
               ),
             ),
-          if (_currentStep > 0) const SizedBox(width: 12),
+            const SizedBox(width: 12),
+          ],
           Expanded(
-            flex: 2,
-            child: ElevatedButton.icon(
-              icon: _isSubmitting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    )
-                  : Icon(
-                      isLast
-                          ? Icons.verified_user_rounded
-                          : Icons.arrow_forward_rounded,
-                      size: 18,
-                      color: Colors.white,
-                    ),
-              label: Text(
-                _isSubmitting
-                    ? "Submitting..."
-                    : isLast
-                        ? "Submit for Verification"
-                        : "Next: Step ${_currentStep + 2}",
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
+            child: SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
                 ),
+                onPressed: _isSubmitting ? null : _nextStep,
+                child: _isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : Text(
+                        isLast ? 'Submit Application' : 'Continue',
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    isLast ? const Color(0xFF047857) : AppColors.primary,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-              ),
-              onPressed: _isSubmitting ? null : _nextStep,
             ),
           ),
         ],
@@ -2823,50 +2121,45 @@ class _DoctorRegistrationScreenState
   }
 
   // -------------------------------------------------------------
-  // UI HELPERS
+  // REUSABLE FORM WIDGETS
   // -------------------------------------------------------------
-  Widget _buildSectionHeader({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppColors.primaryLight,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: AppColors.primary, size: 22),
+  Widget _buildLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF334155),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration({IconData? prefixIcon, Widget? suffixIcon}) {
+    return InputDecoration(
+      filled: true,
+      fillColor: const Color(0xFFF8FAFC),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+      prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 19, color: AppColors.textTertiary) : null,
+      suffixIcon: suffixIcon,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.8),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.error),
+      ),
     );
   }
 
@@ -2874,61 +2167,58 @@ class _DoctorRegistrationScreenState
     required TextEditingController controller,
     required String label,
     required String hint,
+    IconData? prefixIcon,
+    Widget? suffixIcon,
     TextInputType keyboardType = TextInputType.text,
     bool obscureText = false,
     int maxLines = 1,
-    IconData? prefixIcon,
-    Widget? suffixIcon,
   }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      obscureText: obscureText,
-      maxLines: maxLines,
-      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-      decoration: _fieldDecoration(
-        label: label,
-        hint: hint,
-        prefixIcon: prefixIcon,
-        suffixIcon: suffixIcon,
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel(label),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          obscureText: obscureText,
+          maxLines: maxLines,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+          decoration: _inputDecoration(
+            prefixIcon: prefixIcon,
+            suffixIcon: suffixIcon,
+          ).copyWith(
+            hintText: hint,
+            hintStyle: const TextStyle(fontSize: 13.5, color: Color(0xFF94A3B8)),
+          ),
+        ),
+      ],
     );
   }
 
-  InputDecoration _fieldDecoration({
+  Widget _buildDropdownField<T>({
     required String label,
-    String? hint,
+    required T value,
+    required List<T> items,
+    required ValueChanged<T?> onChanged,
     IconData? prefixIcon,
-    Widget? suffixIcon,
   }) {
-    return InputDecoration(
-      filled: true,
-      fillColor: Colors.white,
-      labelText: label,
-      hintText: hint,
-      labelStyle: const TextStyle(
-        fontSize: 12.5,
-        fontWeight: FontWeight.w600,
-        color: AppColors.textSecondary,
-      ),
-      hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-      prefixIcon: prefixIcon != null
-          ? Icon(prefixIcon, size: 19, color: Colors.grey.shade600)
-          : null,
-      suffixIcon: suffixIcon,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: Colors.grey.shade300),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: Colors.grey.shade300),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.8),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel(label),
+        DropdownButtonFormField<T>(
+          initialValue: value,
+          isExpanded: true,
+          decoration: _inputDecoration(prefixIcon: prefixIcon),
+          items: items.map((item) {
+            return DropdownMenuItem(
+              value: item,
+              child: Text(item.toString(), style: const TextStyle(fontSize: 13.5)),
+            );
+          }).toList(),
+          onChanged: onChanged,
+        ),
+      ],
     );
   }
 }

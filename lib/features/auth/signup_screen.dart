@@ -121,15 +121,22 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.verified_user_rounded, color: AppColors.primary, size: 24),
-                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryLight,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.medical_services_outlined, color: AppColors.primary, size: 20),
+                          ),
+                          const SizedBox(width: 12),
                           const Expanded(
                             child: Text(
-                              'Complete 7-Step Doctor Registration',
+                              'Doctor Credential Verification',
                               style: TextStyle(
                                 fontSize: 14.5,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.primary,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ),
@@ -137,23 +144,23 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        'Healthcare regulations require verified medical credentials, state council certificates, clinic details, and document upload.',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        'Healthcare regulations require verified medical council credentials, degree certificates, and clinic practice setup.',
+                        style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.4),
                       ),
                       const SizedBox(height: 14),
                       SizedBox(
                         width: double.infinity,
-                        child: ElevatedButton.icon(
+                        child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
                           ),
-                          icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                          label: const Text(
-                            'Open 7-Step Registration Wizard',
-                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                          child: const Text(
+                            'Open Doctor Application',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
                           ),
                           onPressed: () {
                             Navigator.of(context).pushReplacementNamed(AppRoutes.doctorRegister);
