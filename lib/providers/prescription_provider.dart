@@ -196,7 +196,7 @@ class PrescriptionNotifier extends Notifier<PrescriptionState> {
     );
   }
 
-  
+
   /// Doctor submits completed and digitally signed prescription
   PrescriptionModel submitDoctorPrescription({
     required DoctorModel doctor,

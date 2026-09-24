@@ -105,7 +105,65 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   color: AppColors.textSecondary,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+
+              if (_role == UserRole.doctor) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySoft,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.verified_user_rounded, color: AppColors.primary, size: 24),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'Complete 7-Step Doctor Registration',
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Healthcare regulations require verified medical credentials, state council certificates, clinic details, and document upload.',
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                          label: const Text(
+                            'Open 7-Step Registration Wizard',
+                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                          ),
+                          onPressed: () {
+                            Navigator.of(context).pushReplacementNamed(AppRoutes.doctorRegister);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               AppTextField(
                 controller: _nameController,
