@@ -22,17 +22,18 @@ static const String baseUrl = 'https://www.drconnects24.com/api';
 static Future<http.Response> _request(
   Future<http.Response> Function(String url) requestFn, {
   Duration timeout = const Duration(seconds: 20),
-  String label = '',
+  String endpoint = '',
 }) async {
-  debugPrint('🌐 [LIVE API REQUEST] $label -> $baseUrl');
+  final fullUrl = endpoint.isNotEmpty ? '$baseUrl$endpoint' : baseUrl;
+  debugPrint('🌐 [LIVE API REQUEST] -> $fullUrl');
   try {
     final res = await requestFn(baseUrl).timeout(timeout);
-    debugPrint('📥 [LIVE API RESPONSE] HTTP ${res.statusCode} | $label');
+    debugPrint('📥 [LIVE API RESPONSE] HTTP ${res.statusCode} | $fullUrl');
     debugPrint('📄 [RAW BODY] ${res.body}');
     _printStructuredResponse(res);
     return res;
   } catch (e) {
-    debugPrint('❌ [API ERROR] $label failed: $e');
+    debugPrint('❌ [API ERROR] $fullUrl failed: $e');
     rethrow;
   }
 }
@@ -98,9 +99,6 @@ static Map<String, dynamic> _decodeObject(http.Response response) {
   }
 }
 
-static bool _isSuccess(http.Response response) {
-  return response.statusCode >= 200 && response.statusCode < 300;
-}
 
 /// Prewarm core public catalog APIs on app launch.
 static Future<void> prewarmAllCoreApis() async {
@@ -131,63 +129,62 @@ debugPrint('⚠️ [ApiService] Prewarm error: $e');
 
 /// Unified Login for Patient, Doctor, and Admin
 static Future<Map<String, dynamic>> login({
-required String emailOrPhone,
-required String password,
-required String role,
+  required String emailOrPhone,
+  required String password,
+  required String role,
 }) async {
-try {
-final res = await _request(
-(url) => http.post(
-Uri.parse('$url/auth/login'),
-headers: {'Content-Type': 'application/json'},
-body: jsonEncode({
-'emailOrPhone': emailOrPhone,
-'password': password,
-'role': role,
-}),
-),
-
-);
-if (!_isSuccess(res)) {
-return _decodeObject(res);
-
-}
-return _decodeObject(res);
-} catch (e) {
-debugPrint('ApiService.login error: $e');
-return _errorResponse(e);
-}
+  try {
+    final res = await _request(
+      (url) => http.post(
+        Uri.parse('$url/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'emailOrPhone': emailOrPhone,
+          'password': password,
+          'role': role,
+        }),
+      ),
+      endpoint: '/auth/login',
+    );
+    return _decodeObject(res);
+  } catch (e) {
+    debugPrint('ApiService.login error: $e');
+    return _errorResponse(e);
+  }
 }
 
 /// Patient Registration
 static Future<Map<String, dynamic>> registerPatient({
-required String name,
-required String email,
-required String phone,
-required String password,
-String gender = 'Male',
-String dob = '1995-08-15',
-String currentCity = 'Jaipur',
+  required String name,
+  required String email,
+  required String phone,
+  required String password,
+  String gender = 'Male',
+  String dob = '1995-08-15',
+  String currentCity = 'Jaipur',
 }) async {
-try {
-final res = await _request((url) => http.post(
-Uri.parse('$url/auth/register-patient'),
-headers: {'Content-Type': 'application/json'},
-body: jsonEncode({
-'name': name,
-'email': email,
-'phone': phone,
-'password': password,
-'gender': gender,
-'dob': dob,
-'currentCity': currentCity,
-}),
-));
-return jsonDecode(res.body);
-} catch (e) {
-debugPrint('ApiService.registerPatient error: $e');
-return _errorResponse(e);
-}
+  try {
+    final res = await _request(
+      (url) => http.post(
+        Uri.parse('$url/auth/register-patient'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': name,
+          'email': email,
+          'phone': phone,
+          'password': password,
+          'gender': gender,
+          'dob': dob,
+          'currentCity': currentCity,
+        }),
+      ),
+      endpoint: '/auth/register-patient',
+    );
+    return _decodeObject(res);
+  } catch (e) {
+    debugPrint('ApiService.registerPatient error: $e');
+    return _errorResponse(e);
+  }
 }
 
 /// Register Doctor with full licensing documentation
@@ -262,32 +259,32 @@ body: jsonEncode({
 'clinicAddressProofUrl': clinicAddressProofUrl,
 'doctorSignatureUrl': doctorSignatureUrl,
 'qualificationCertUrl': medicalCouncilCertUrl,
-'imageUrl': imageUrl,
-'languages': languages,
-'aboutText': aboutText,
-}),
-));
-return jsonDecode(res.body);
+        'imageUrl': imageUrl,
+        'languages': languages,
+        'aboutText': aboutText,
+      }),
+    ),
+    endpoint: '/auth/doctor-register',
+  );
+  return _decodeObject(res);
 } catch (e) {
-debugPrint('ApiService.registerDoctor error: $e');
-return _errorResponse(e);
+  debugPrint('ApiService.registerDoctor error: $e');
+  return _errorResponse(e);
 }
 }
 
 /// Check verification status of doctor
 static Future<Map<String, dynamic>> getDoctorStatus(String doctorId) async {
 try {
-final res = await _request(
-(url) => http.get(Uri.parse('$url/auth/doctor-status/$doctorId')),
-
-);
-if (res.statusCode == 200) {
-return jsonDecode(res.body);
-}
+  final res = await _request(
+    (url) => http.get(Uri.parse('$url/auth/doctor-status/$doctorId')),
+    endpoint: '/auth/doctor-status/$doctorId',
+  );
+  return _decodeObject(res);
 } catch (e) {
-debugPrint('ApiService.getDoctorStatus error: $e');
+  debugPrint('ApiService.getDoctorStatus error: $e');
+  return _errorResponse(e);
 }
-return {'success': false, 'message': 'Unable to fetch doctor status'};
 }
 
 // =========================================================================
@@ -335,7 +332,7 @@ return false;
 /// Delete Account Permanently
 static Future<bool> deleteAccount(String userId) async {
 try {
-final res = await _request((url) => http.delete(Uri.parse('$url/users/$userId')));
+final res = await _request((url) => http.delete(Uri.parse('$url/users/$userId')), endpoint: '/users/$userId');
 if (res.statusCode == 200) {
 final json = jsonDecode(res.body);
 return json['success'] == true;
@@ -353,7 +350,7 @@ return false;
 /// Fetch all doctors dynamically
 static Future<List<DoctorModel>> fetchDoctors({bool all = true}) async {
 try {
-final res = await _request((url) => http.get(Uri.parse('$url/doctors?all=$all')));
+final res = await _request((url) => http.get(Uri.parse('$url/doctors?all=$all')), endpoint: '/doctors?all=$all');
 if (res.statusCode == 200) {
 final json = jsonDecode(res.body);
 if (json['success'] == true && json['data'] != null) {
@@ -370,7 +367,7 @@ return [];
 /// Delete Doctor (Admin action)
 static Future<bool> deleteDoctor(String id) async {
 try {
-final res = await _request((url) => http.delete(Uri.parse('$url/doctors/$id')));
+final res = await _request((url) => http.delete(Uri.parse('$url/doctors/$id')), endpoint: '/doctors/$id');
 return res.statusCode == 200;
 } catch (e) {
 debugPrint('ApiService deleteDoctor error: $e');
@@ -381,7 +378,7 @@ return false;
 /// Fetch specialties dynamically
 static Future<List<SpecialtyModel>> fetchSpecialties() async {
 try {
-final res = await _request((url) => http.get(Uri.parse('$url/specialties')));
+final res = await _request((url) => http.get(Uri.parse('$url/specialties')), endpoint: '/specialties');
 if (res.statusCode == 200) {
 final json = jsonDecode(res.body);
 if (json['success'] == true && json['data'] != null) {
@@ -398,7 +395,7 @@ return [];
 /// Fetch diseases & symptoms dynamically
 static Future<List<DiseaseModel>> fetchDiseases() async {
 try {
-final res = await _request((url) => http.get(Uri.parse('$url/diseases')));
+final res = await _request((url) => http.get(Uri.parse('$url/diseases')), endpoint: '/diseases');
 if (res.statusCode == 200) {
 final json = jsonDecode(res.body);
 if (json['success'] == true && json['data'] != null) {
@@ -415,7 +412,7 @@ return [];
 /// Fetch hospitals dynamically
 static Future<List<HospitalModel>> fetchHospitals() async {
 try {
-final res = await _request((url) => http.get(Uri.parse('$url/hospitals')));
+final res = await _request((url) => http.get(Uri.parse('$url/hospitals')), endpoint: '/hospitals');
 if (res.statusCode == 200) {
 final json = jsonDecode(res.body);
 if (json['success'] == true && json['data'] != null) {
@@ -436,7 +433,7 @@ return [];
 /// Fetch all available Care Plans
 static Future<List<SubscriptionPlanModel>> fetchPlans() async {
 try {
-final res = await _request((url) => http.get(Uri.parse('$url/plans')));
+final res = await _request((url) => http.get(Uri.parse('$url/plans')), endpoint: '/plans');
 if (res.statusCode == 200) {
 final json = jsonDecode(res.body);
 if (json['success'] == true && json['data'] != null) {
