@@ -592,54 +592,57 @@ static Future<Map<String, dynamic>> getDoctorStatus(String doctorId) async {
 
 /// Fetch User Profile
 static Future<UserModel?> getUserProfile(String userId) async {
-try {
-final res = await _request(
-(url) => http.get(Uri.parse('$url/users/$userId')),
-
-);
-if (res.statusCode == 200) {
-final json = jsonDecode(res.body);
-if (json['success'] == true && json['data'] != null) {
-final uData = json['data']['user'] ?? json['data'];
-return UserModel.fromJson(uData);
-}
-}
-} catch (e) {
-debugPrint('ApiService.getUserProfile error: $e');
-}
-return null;
+  try {
+    final res = await _request(
+      (url) => http.get(Uri.parse('$url/users?id=$userId')),
+      endpoint: '/users?id=$userId',
+    );
+    if (res.statusCode == 200) {
+      final json = jsonDecode(res.body);
+      if (json['success'] == true && json['data'] != null) {
+        final uData = json['data']['user'] ?? json['data'];
+        return UserModel.fromJson(uData);
+      }
+    }
+  } catch (e) {
+    debugPrint('ApiService.getUserProfile error: $e');
+  }
+  return null;
 }
 
 /// Update User Profile
 static Future<bool> updateUserProfile(String userId, Map<String, dynamic> data) async {
-try {
-final res = await _request((url) => http.put(
-Uri.parse('$url/users/$userId'),
-headers: {'Content-Type': 'application/json'},
-body: jsonEncode(data),
-));
-if (res.statusCode == 200) {
-final json = jsonDecode(res.body);
-return json['success'] == true;
-}
-} catch (e) {
-debugPrint('ApiService.updateUserProfile error: $e');
-}
-return false;
+  try {
+    final res = await _request((url) => http.put(
+      Uri.parse('$url/users?id=$userId'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(data),
+    ), endpoint: '/users?id=$userId');
+    if (res.statusCode == 200) {
+      final json = jsonDecode(res.body);
+      return json['success'] == true;
+    }
+  } catch (e) {
+    debugPrint('ApiService.updateUserProfile error: $e');
+  }
+  return false;
 }
 
 /// Delete Account Permanently
 static Future<bool> deleteAccount(String userId) async {
-try {
-final res = await _request((url) => http.delete(Uri.parse('$url/users/$userId')), endpoint: '/users/$userId');
-if (res.statusCode == 200) {
-final json = jsonDecode(res.body);
-return json['success'] == true;
-}
-} catch (e) {
-debugPrint('ApiService.deleteAccount error: $e');
-}
-return false;
+  try {
+    final res = await _request(
+      (url) => http.delete(Uri.parse('$url/users?id=$userId')),
+      endpoint: '/users?id=$userId',
+    );
+    if (res.statusCode == 200) {
+      final json = jsonDecode(res.body);
+      return json['success'] == true;
+    }
+  } catch (e) {
+    debugPrint('ApiService.deleteAccount error: $e');
+  }
+  return false;
 }
 
 // =========================================================================
@@ -665,13 +668,16 @@ return [];
 
 /// Delete Doctor (Admin action)
 static Future<bool> deleteDoctor(String id) async {
-try {
-final res = await _request((url) => http.delete(Uri.parse('$url/doctors/$id')), endpoint: '/doctors/$id');
-return res.statusCode == 200;
-} catch (e) {
-debugPrint('ApiService deleteDoctor error: $e');
-return false;
-}
+  try {
+    final res = await _request(
+      (url) => http.delete(Uri.parse('$url/doctors?id=$id')),
+      endpoint: '/doctors?id=$id',
+    );
+    return res.statusCode == 200;
+  } catch (e) {
+    debugPrint('ApiService deleteDoctor error: $e');
+    return false;
+  }
 }
 
 /// Fetch specialties dynamically
@@ -760,59 +766,60 @@ return [];
 
 /// Purchase Care Plan Subscription
 static Future<Map<String, dynamic>> purchaseSubscription({
-required String userId,
-required String planId,
-required String paymentMethod,
-required double amount,
+  required String userId,
+  required String planId,
+  required String paymentMethod,
+  required double amount,
 }) async {
-try {
-final res = await _request((url) => http.post(
-Uri.parse('$url/subscriptions/purchase'),
-headers: {'Content-Type': 'application/json'},
-body: jsonEncode({
-'userId': userId,
-'planId': planId,
-'paymentMethod': paymentMethod,
-'amount': amount,
-}),
-));
-return jsonDecode(res.body);
-} catch (e) {
-debugPrint('ApiService purchaseSubscription error: $e');
-return _errorResponse(e);
-}
+  try {
+    final res = await _request((url) => http.post(
+      Uri.parse('$url/subscriptions'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'action': 'purchase',
+        'userId': userId,
+        'planId': planId,
+        'paymentMethod': paymentMethod,
+        'amount': amount,
+      }),
+    ), endpoint: '/subscriptions');
+    return jsonDecode(res.body);
+  } catch (e) {
+    debugPrint('ApiService purchaseSubscription error: $e');
+    return _errorResponse(e);
+  }
 }
 
 /// Fetch active user subscription
 static Future<Map<String, dynamic>?> getUserSubscription(String userId) async {
-try {
-final res = await _request(
-(url) => http.get(Uri.parse('$url/subscriptions/$userId')),
-
-);
-if (res.statusCode == 200) {
-final json = jsonDecode(res.body);
-return json['data'];
-}
-} catch (e) {
-debugPrint('ApiService getUserSubscription error: $e');
-}
-return null;
+  try {
+    final res = await _request(
+      (url) => http.get(Uri.parse('$url/subscriptions?userId=$userId')),
+      endpoint: '/subscriptions?userId=$userId',
+    );
+    if (res.statusCode == 200) {
+      final json = jsonDecode(res.body);
+      return json['data'];
+    }
+  } catch (e) {
+    debugPrint('ApiService getUserSubscription error: $e');
+  }
+  return null;
 }
 
 /// Cancel subscription
 static Future<bool> cancelSubscription(String userId, String subscriptionId) async {
-try {
-final res = await _request((url) => http.post(
-Uri.parse('$url/subscriptions/cancel'),
-headers: {'Content-Type': 'application/json'},
-body: jsonEncode({'userId': userId, 'subscriptionId': subscriptionId}),
-));
-return res.statusCode == 200;
-} catch (e) {
-debugPrint('ApiService cancelSubscription error: $e');
-return false;
-}
+  try {
+    final res = await _request((url) => http.post(
+      Uri.parse('$url/subscriptions'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'action': 'cancel', 'userId': userId, 'subscriptionId': subscriptionId}),
+    ), endpoint: '/subscriptions');
+    return res.statusCode == 200;
+  } catch (e) {
+    debugPrint('ApiService cancelSubscription error: $e');
+    return false;
+  }
 }
 
 // =========================================================================
@@ -823,8 +830,8 @@ return false;
 static Future<WalletAccount?> getWallet(String userId) async {
   try {
     final res = await _request(
-      (url) => http.get(Uri.parse('$url/wallet/$userId')),
-      endpoint: '/wallet/$userId',
+      (url) => http.get(Uri.parse('$url/wallet?userId=$userId')),
+      endpoint: '/wallet?userId=$userId',
     );
     if (res.statusCode == 200) {
       final json = jsonDecode(res.body);
@@ -869,57 +876,58 @@ static Future<WalletAccount?> getWallet(String userId) async {
 
 /// Add Money to HealthPay Wallet
 static Future<WalletAccount?> topupWallet({
-required String userId,
-required double amount,
-required String paymentMethod,
+  required String userId,
+  required double amount,
+  required String paymentMethod,
 }) async {
-try {
-final res = await _request((url) => http.post(
-Uri.parse('$url/wallet/topup'),
-headers: {'Content-Type': 'application/json'},
-body: jsonEncode({
-'userId': userId,
-'amount': amount,
-'paymentMethod': paymentMethod,
-}),
-));
-if (res.statusCode == 200) {
-final json = jsonDecode(res.body);
-if (json['success'] == true && json['data'] != null) {
-return WalletAccount.fromJson(json['data']);
-}
-}
-} catch (e) {
-debugPrint('ApiService topupWallet error: $e');
-}
-return null;
+  try {
+    final res = await _request((url) => http.post(
+      Uri.parse('$url/wallet'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'action': 'topup',
+        'userId': userId,
+        'amount': amount,
+        'paymentMethod': paymentMethod,
+      }),
+    ), endpoint: '/wallet');
+    if (res.statusCode == 200) {
+      final json = jsonDecode(res.body);
+      if (json['success'] == true && json['data'] != null) {
+        return WalletAccount.fromJson(json['data']);
+      }
+    }
+  } catch (e) {
+    debugPrint('ApiService topupWallet error: $e');
+  }
+  return null;
 }
 
 /// Pay via HealthPay Wallet
 static Future<Map<String, dynamic>> payWithWallet({
-required String userId,
-required double amount,
-required String purpose,
-String category = 'consultation',
-String? referenceId,
+  required String userId,
+  required double amount,
+  required String purpose,
+  String category = 'consultation',
+  String? referenceId,
 }) async {
-try {
-final res = await _request((url) => http.post(
-Uri.parse('$url/wallet/pay'),
-headers: {'Content-Type': 'application/json'},
-body: jsonEncode({
-'userId': userId,
-'amount': amount,
-'purpose': purpose,
-'category': category,
-'referenceId': referenceId,
-}),
-));
-return jsonDecode(res.body);
-} catch (e) {
-debugPrint('ApiService payWithWallet error: $e');
-return _errorResponse(e);
-}
+  try {
+    final res = await _request((url) => http.post(
+      Uri.parse('$url/wallet'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'action': 'pay',
+        'userId': userId,
+        'amount': amount,
+        'description': purpose,
+        'category': category,
+        'referenceId': referenceId,
+      }),
+    ), endpoint: '/wallet');
+    return _decodeObject(res);
+  } catch (e) {
+    debugPrint('ApiService payWithWallet error: $e');
+    return _errorResponse(e);
 }
 
 // =========================================================================

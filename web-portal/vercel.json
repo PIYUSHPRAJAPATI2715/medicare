@@ -3,11 +3,9 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/api/auth/(.*)", "destination": "/api/auth" },
-    { "source": "/api/wallet/(.*)", "destination": "/api/wallet?userId=$1" },
-    { "source": "/api/subscriptions/(.*)", "destination": "/api/subscriptions?userId=$1" },
-    { "source": "/api/users/(.*)", "destination": "/api/users?id=$1" },
-    { "source": "/api/doctors/(.*)", "destination": "/api/doctors?id=$1" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }
