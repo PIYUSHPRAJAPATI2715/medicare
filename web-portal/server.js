@@ -192,6 +192,8 @@ const server = http.createServer(async (req, res) => {
         doc.verificationStatus = body.status || 'approved';
         doc.isVerified = body.status === 'approved';
         doc.rejectionNotes = body.notes || '';
+        doc.rejectionRemarks = body.notes || '';
+        doc.verifiedAt = body.status === 'approved' ? new Date().toISOString() : null;
       }
       return sendJson(res, 200, { success: true, message: 'Doctor status updated', data: doc });
     }
@@ -201,13 +203,24 @@ const server = http.createServer(async (req, res) => {
       const newDoc = {
         id: `d_${Date.now()}`,
         name: body.name || 'Dr. Practitioner',
+        email: body.email || 'doctor@medicare.com',
+        phone: body.phone || '+91 98000 00000',
+        gender: body.gender || 'Male',
+        dateOfBirth: body.dateOfBirth || '1988-06-15',
         specialty: body.specialty || 'General Physician',
+        subSpecialty: body.subSpecialty || '',
         qualification: body.qualification || 'MBBS',
-        experienceYears: Number(body.experienceYears) || 3,
-        experienceText: `${body.experienceYears || 3} yrs exp`,
+        collegeName: body.collegeName || 'Recognized Medical College',
+        graduationYear: body.graduationYear || '2015',
+        postGradDegree: body.postGradDegree || '',
+        postGradCollege: body.postGradCollege || '',
+        postGradYear: body.postGradYear || '',
+        experienceYears: Number(body.experienceYears) || 5,
+        experienceText: `${body.experienceYears || 5} yrs exp`,
         ratingPercentage: 100,
         patientStoriesCount: 0,
-        consultationFee: Number(body.consultationFee) || 500,
+        consultationFee: Number(body.consultationFee) || 600,
+        videoConsultationFee: Number(body.videoConsultationFee) || 499,
         imageUrl: body.imageUrl || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400',
         isOnline: false,
         allowsPhysical: true,
@@ -216,18 +229,27 @@ const server = http.createServer(async (req, res) => {
         verificationStatus: 'pending',
         medicalLicenseNo: body.medicalLicenseNo || 'MCI/2026/PENDING',
         stateMedicalCouncil: body.stateMedicalCouncil || 'Medical Council of India',
-        qualificationCertUrl: body.qualificationCertUrl || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600',
-        idProofUrl: body.idProofUrl || 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600',
-        clinicAddressProofUrl: body.clinicAddressProofUrl || 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=600',
-        clinicName: body.clinicName || 'Clinic',
-        clinicAddress: body.clinicAddress || 'Jaipur',
+        registrationYear: body.registrationYear || '2015',
+        licenseExpiryYear: body.licenseExpiryYear || '2035',
+        medicalCouncilCertUrl: body.medicalCouncilCertUrl || body.qualificationCertUrl || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800',
+        primaryDegreeCertUrl: body.primaryDegreeCertUrl || body.qualificationCertUrl || 'https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?w=800',
+        postGradCertUrl: body.postGradCertUrl || 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800',
+        idProofUrl: body.idProofUrl || 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800',
+        clinicAddressProofUrl: body.clinicAddressProofUrl || 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=800',
+        doctorSignatureUrl: body.doctorSignatureUrl || 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800',
+        qualificationCertUrl: body.medicalCouncilCertUrl || body.qualificationCertUrl || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800',
+        clinicName: body.clinicName || 'City Health Clinic',
+        clinicAddress: body.clinicAddress || 'Jaipur, Rajasthan',
+        city: body.city || 'Jaipur',
+        pincode: body.pincode || '302017',
         distanceKm: 2.5,
-        languages: ['English', 'Hindi'],
-        aboutText: `${body.name} registered medical professional.`,
-        services: ['Consultation'],
+        languages: body.languages && Array.isArray(body.languages) ? body.languages : ['English', 'Hindi'],
+        aboutText: body.aboutText || `${body.name} registered medical professional.`,
+        services: ['Consultation', 'Routine Examination'],
+        submittedAt: new Date().toISOString(),
       };
       db.doctors.unshift(newDoc);
-      return sendJson(res, 200, { success: true, message: 'Registration submitted successfully', data: newDoc });
+      return sendJson(res, 200, { success: true, message: 'Registration submitted successfully with all 6 medical documents', data: newDoc });
     }
 
     // 3. Specialties
