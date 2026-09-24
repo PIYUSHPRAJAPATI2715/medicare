@@ -12,6 +12,17 @@ const PORT = process.env.PORT || 5050;
 app.use(cors());
 app.use(express.json());
 
+// Request logger middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  const timestamp = new Date().toLocaleTimeString();
+  console.log(`[${timestamp}] 📥 [API IN] ${req.method} ${req.originalUrl}`);
+  res.on('finish', () => {
+    console.log(`[${timestamp}] 📤 [API OUT] ${req.method} ${req.originalUrl} -> ${res.statusCode} (${Date.now() - start}ms)`);
+  });
+  next();
+});
+
 // Healthcheck
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'MediCare+ Backend API Running', timestamp: new Date() });
@@ -27,10 +38,11 @@ const startServer = async () => {
     await seedInitialData();
   }
 
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`=================================================`);
     console.log(`🚀 MediCare+ REST API Server running on port ${PORT}`);
-    console.log(`🌐 Base URL: http://localhost:${PORT}/api`);
+    console.log(`🌐 Base URL: http://0.0.0.0:${PORT}/api`);
+    console.log(`🌐 Local URL: http://localhost:${PORT}/api`);
     console.log(`🎥 Agora RTC/RTM Token Service Ready`);
     console.log(`=================================================`);
   });

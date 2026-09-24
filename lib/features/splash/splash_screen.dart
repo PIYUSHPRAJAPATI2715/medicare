@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/routes/app_routes.dart';
 import '../../widgets/medicare_logo.dart';
+import '../../services/api_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -20,6 +21,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
+    // Eagerly prewarm core REST APIs upon launch
+    ApiService.prewarmAllCoreApis();
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),

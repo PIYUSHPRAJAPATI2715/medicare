@@ -131,7 +131,10 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
     final specialties = ref.watch(specialtiesListProvider);
-    final recentDoctors = MockData.doctors.take(3).toList();
+    final allDocsAsync = ref.watch(allDoctorsProvider);
+    final recentDoctors = (allDocsAsync.value != null && allDocsAsync.value!.isNotEmpty)
+        ? allDocsAsync.value!.take(3).toList()
+        : MockData.doctors.take(3).toList();
     final wallet = ref.watch(walletProvider);
     final prescriptionState = ref.watch(prescriptionProvider);
     final rxCount = prescriptionState.prescriptions.length;

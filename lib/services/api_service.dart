@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -27,25 +28,53 @@ class ApiService {
 
   static String get baseUrl => _activeBaseUrl;
 
-  /// Helper to send request with fallback across base URLs if connection fails
   static Future<http.Response> _safeRequest(
     Future<http.Response> Function(String url) requestFn, {
     Duration timeout = const Duration(seconds: 4),
   }) async {
+    Object? lastError;
     try {
-      return await requestFn(_activeBaseUrl).timeout(timeout);
-    } catch (_) {
-      // If primary failed, test candidates
+      debugPrint('📡 [ApiService OUT] Request -> $_activeBaseUrl');
+      final res = await requestFn(_activeBaseUrl).timeout(timeout);
+      debugPrint('✅ [ApiService IN] Response <- $_activeBaseUrl (HTTP ${res.statusCode})');
+      return res;
+    } catch (e) {
+      lastError = e;
+      debugPrint('⚠️ [ApiService] Initial request to $_activeBaseUrl failed ($e). Searching alternate endpoints...');
       for (final candidate in _candidateUrls) {
         if (candidate == _activeBaseUrl) continue;
         try {
-          final res = await requestFn(candidate).timeout(const Duration(seconds: 2));
+          debugPrint('🔄 [ApiService] Probing fallback candidate: $candidate');
+          final res = await requestFn(candidate).timeout(const Duration(seconds: 3));
           _activeBaseUrl = candidate;
-          debugPrint('🌐 ApiService switched active base URL to: $_activeBaseUrl');
+          debugPrint('🎉 [ApiService] Connected to live backend at: $_activeBaseUrl (HTTP ${res.statusCode})');
           return res;
-        } catch (_) {}
+        } catch (probeErr) {
+          debugPrint('❌ [ApiService] Candidate $candidate unreachable: $probeErr');
+          lastError = probeErr;
+        }
       }
-      rethrow;
+      throw lastError ?? Exception('All candidate endpoints failed');
+    }
+  }
+
+  /// Preload core catalogs on app launch to populate memory & verify connection
+  static Future<void> prewarmAllCoreApis() async {
+    debugPrint('🚀 [ApiService] Starting background pre-warm of core health APIs...');
+    try {
+      final futures = await Future.wait([
+        fetchDoctors(),
+        fetchSpecialties(),
+        fetchPlans(),
+        fetchDiseases(),
+        fetchHospitals(),
+      ], eagerError: false);
+      final docs = futures[0] as List;
+      final specs = futures[1] as List;
+      final plans = futures[2] as List;
+      debugPrint('🌟 [ApiService] Prewarm completed! Loaded ${docs.length} doctors, ${specs.length} specialties, ${plans.length} care plans.');
+    } catch (e) {
+      debugPrint('⚠️ [ApiService] Prewarm encountered error: $e');
     }
   }
 
