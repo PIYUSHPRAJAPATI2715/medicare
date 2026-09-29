@@ -30,8 +30,8 @@ export default function UsersPage() {
     avatarUrl: AVATAR_PRESETS[0].url,
   });
 
-  const loadUsers = async () => {
-    setLoading(true);
+  const loadUsers = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const res = await fetchUsers();
       if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
@@ -40,12 +40,24 @@ export default function UsersPage() {
     } catch (err) {
       console.warn('Error loading users:', err);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadUsers();
+    // Auto-poll every 4 seconds so newly registered patients in the app appear immediately
+    const timer = setInterval(() => {
+      loadUsers(true);
+    }, 4000);
+
+    const onFocus = () => loadUsers(true);
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   const handleOpenModal = () => {
@@ -130,6 +142,10 @@ export default function UsersPage() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
+          <div className="hidden sm:flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl border border-emerald-100 text-xs font-bold">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Live Auto-Sync</span>
+          </div>
           <div className="hidden sm:flex items-center gap-2 bg-blue-50 text-blue-700 px-3.5 py-2 rounded-xl border border-blue-100 text-xs font-bold">
             <Users className="w-4 h-4" />
             <span>{users.length} Patients</span>

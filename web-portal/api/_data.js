@@ -1,5 +1,18 @@
 export const initialUsers = [
   {
+    id: 'u_1790659226628',
+    name: 'fxjdj',
+    email: 'g@g.com',
+    phone: '65656465656',
+    role: 'patient',
+    status: 'active',
+    createdAt: '2026-09-29T05:20:26.628Z',
+    gender: 'Male',
+    dob: '15/08/1995',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+    currentCity: 'Jaipur',
+  },
+  {
     id: 'u1',
     name: 'Piyush Prajapati',
     email: 'piyush@example.com',

@@ -89,7 +89,13 @@ export const testApiConnection = async () => {
  */
 const safeFetch = async (endpoint, fallbackData) => {
   try {
-    const res = await api.get(endpoint);
+    const sep = endpoint.includes('?') ? '&' : '?';
+    const res = await api.get(`${endpoint}${sep}_t=${Date.now()}`, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    });
     if (res.data && Array.isArray(res.data.data)) {
       return res.data;
     }
@@ -145,7 +151,9 @@ export const createAppointment = (apptData) =>
 
 // Payments & Razorpay (for Admin)
 export const fetchPayments = () =>
-  api.get('/payments')
+  api.get(`/payments?_t=${Date.now()}`, {
+    headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
+  })
     .then(res => res.data)
     .catch(() => ({ success: true, data: [] }));
 

@@ -27,8 +27,8 @@ export default function PaymentsPage() {
   const [copiedId, setCopiedId] = useState(null);
   const [selectedTxn, setSelectedTxn] = useState(null);
 
-  const loadPayments = async () => {
-    setLoading(true);
+  const loadPayments = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const res = await fetchPayments();
       if (res && res.data && Array.isArray(res.data)) {
@@ -37,12 +37,24 @@ export default function PaymentsPage() {
     } catch (err) {
       console.warn('Error fetching payments:', err);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadPayments();
+    // Auto-poll payments every 4 seconds
+    const timer = setInterval(() => {
+      loadPayments(true);
+    }, 4000);
+
+    const onFocus = () => loadPayments(true);
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   const copyToClipboard = (text, id) => {

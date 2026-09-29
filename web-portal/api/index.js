@@ -32,8 +32,12 @@ function sendJson(res, statusCode, payload) {
   res.statusCode = statusCode;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
   return res.end(JSON.stringify(payload));
 }
 
@@ -94,7 +98,8 @@ export default async function handler(req, res) {
 
   const { pathname, query } = parseUrlAndQuery(req.url);
   const body = await getRequestBody(req);
-  const method = req.method ? req.method.toUpperCase() : 'GET';
+  const rawMethod = req.method ? req.method.toUpperCase() : 'GET';
+  const method = rawMethod === 'HEAD' ? 'GET' : rawMethod;
 
   // Normalize path without trailing slash
   const path = pathname.replace(/\/$/, '');

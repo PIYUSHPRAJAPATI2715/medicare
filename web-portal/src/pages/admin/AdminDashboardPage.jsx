@@ -26,8 +26,8 @@ export default function AdminDashboardPage() {
   });
   const [loading, setLoading] = useState(false);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const [analyticsRes, usersRes, doctorsRes, paymentsRes] = await Promise.allSettled([
         fetchAnalytics(),
@@ -54,12 +54,23 @@ export default function AdminDashboardPage() {
     } catch (err) {
       console.warn('Dashboard data load error:', err);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadData();
+    const timer = setInterval(() => {
+      loadData(true);
+    }, 5000);
+
+    const onFocus = () => loadData(true);
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   const stats = [
