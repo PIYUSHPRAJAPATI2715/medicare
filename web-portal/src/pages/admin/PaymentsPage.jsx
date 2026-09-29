@@ -66,6 +66,7 @@ export default function PaymentsPage() {
   const totalRevenue = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   const subscriptionPayments = payments.filter(p => p.type === 'subscription');
   const consultationPayments = payments.filter(p => p.type === 'consultation');
+  const walletPayments = payments.filter(p => p.type === 'wallet_topup' || (p.purpose && p.purpose.toLowerCase().includes('wallet')));
 
   const filtered = payments.filter((p) => {
     const matchesSearch =
@@ -79,6 +80,7 @@ export default function PaymentsPage() {
     if (filterType === 'all') return matchesSearch;
     if (filterType === 'subscription') return matchesSearch && p.type === 'subscription';
     if (filterType === 'consultation') return matchesSearch && p.type === 'consultation';
+    if (filterType === 'wallet_topup') return matchesSearch && (p.type === 'wallet_topup' || (p.purpose && p.purpose.toLowerCase().includes('wallet')));
     return matchesSearch;
   });
 
@@ -171,6 +173,7 @@ export default function PaymentsPage() {
           {[
             { id: 'all', label: 'All Payments' },
             { id: 'subscription', label: 'Care Plans' },
+            { id: 'wallet_topup', label: 'Wallet Top-ups' },
             { id: 'consultation', label: 'Consultations' },
           ].map((tab) => (
             <button

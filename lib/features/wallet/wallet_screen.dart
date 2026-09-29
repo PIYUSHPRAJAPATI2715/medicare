@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/wallet_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/wallet_provider.dart';
+import '../../services/api_service.dart';
+import '../../services/razorpay_service.dart';
 import '../../widgets/custom_app_bar.dart';
 
 class WalletScreen extends ConsumerStatefulWidget {
@@ -16,6 +19,108 @@ class WalletScreen extends ConsumerStatefulWidget {
 
 class _WalletScreenState extends ConsumerState<WalletScreen> {
   int _selectedFilter = 0; // 0: All, 1: Spent, 2: Added, 3: Cashback
+  late RazorpayService _razorpayService;
+  double _pendingTopupAmount = 0.0;
+  bool _isProcessingTopup = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _razorpayService = RazorpayService();
+    _razorpayService.init(
+      onSuccess: _handleTopUpSuccess,
+      onError: _handleTopUpError,
+    );
+  }
+
+  @override
+  void dispose() {
+    _razorpayService.dispose();
+    super.dispose();
+  }
+
+  void _handleTopUpSuccess(PaymentSuccessResponse response) async {
+    final amount = _pendingTopupAmount;
+    if (amount <= 0) return;
+    final currentUser = ref.read(authProvider).user;
+
+    setState(() => _isProcessingTopup = true);
+
+    // 1. Record payment in live admin database as wallet_topup
+    await ApiService.verifyPaymentSuccess(
+      orderId: response.orderId ?? 'ORD-TOPUP-${DateTime.now().millisecondsSinceEpoch}',
+      userId: currentUser.id,
+      amount: amount,
+      paymentId: response.paymentId ?? 'PAY-${DateTime.now().millisecondsSinceEpoch}',
+      paymentMethod: 'Razorpay UPI',
+      purpose: 'HealthPay Wallet Top-Up',
+      type: 'wallet_topup',
+    );
+
+    // 2. Add money to wallet provider
+    await ref.read(walletProvider.notifier).addMoney(
+      amount,
+      'Razorpay (${response.paymentId ?? "Live"})',
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _isProcessingTopup = false;
+      _pendingTopupAmount = 0.0;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFF0E9F6E),
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text('₹${amount.toStringAsFixed(0)} added to MediCare Wallet successfully via Razorpay!'),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _handleTopUpError(PaymentFailureResponse response) {
+    if (!mounted) return;
+    setState(() {
+      _isProcessingTopup = false;
+      _pendingTopupAmount = 0.0;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.red.shade700,
+        content: Text('Wallet Top-up cancelled or failed: ${response.message ?? "Payment cancelled"}'),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _startRazorpayTopup(double amount) {
+    final currentUser = ref.read(authProvider).user;
+    setState(() {
+      _pendingTopupAmount = amount;
+      _isProcessingTopup = true;
+    });
+
+    _razorpayService.openCheckout(
+      amount: amount,
+      name: 'HealthPay Wallet Top-Up',
+      description: 'Add ₹${amount.toStringAsFixed(0)} to MediCare HealthPay Wallet',
+      userEmail: currentUser.email,
+      userPhone: currentUser.phone,
+      userName: currentUser.name,
+      notes: {
+        'userId': currentUser.id,
+        'type': 'wallet_topup',
+      },
+    );
+  }
 
   void _showTopUpSheet() {
     final amountController = TextEditingController(text: '1000');
@@ -182,27 +287,19 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                         final val =
                             double.tryParse(amountController.text.trim()) ?? 0;
                         if (val <= 0) return;
-                        ref
-                            .read(walletProvider.notifier)
-                            .addMoney(val, selectedMethod);
                         Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            backgroundColor: const Color(0xFF0E9F6E),
-                            content: Row(
-                              children: [
-                                const Icon(Icons.check_circle_rounded,
-                                    color: Colors.white),
-                                const SizedBox(width: 10),
-                                Text('₹$val added to MediCare Wallet successfully!'),
-                              ],
-                            ),
-                          ),
-                        );
+                        _startRazorpayTopup(val);
                       },
-                      child: const Text('Proceed to Pay & Add Money',
-                          style: TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w800)),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.bolt_rounded, size: 20),
+                          SizedBox(width: 8),
+                          Text('Proceed to Pay with Razorpay',
+                              style: TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.w800)),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -306,11 +403,13 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
         title: 'MediCare Wallet',
         subtitle: 'Digital HealthPay & Cashback',
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             // 1. Digital HealthPay Card
             Container(
               width: double.infinity,
@@ -579,7 +678,30 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           ],
         ),
       ),
-    );
+      if (_isProcessingTopup)
+        Container(
+          color: Colors.black45,
+          child: const Center(
+            child: Card(
+              elevation: 8,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Processing Razorpay Top-Up...',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+    ],
+  ),
+);
   }
 
   Widget _filterChip(int index, String label) {

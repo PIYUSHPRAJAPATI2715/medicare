@@ -547,15 +547,15 @@ export default async function handler(req, res) {
 
       const recordedPayment = addPayment({
         userId: body.userId || (user ? user.id : 'u1'),
-        userName: user ? user.name : 'Patient',
-        userEmail: user ? user.email : '',
-        userPhone: user ? user.phone : '',
+        userName: user ? user.name : (body.userName || 'Patient'),
+        userEmail: user ? user.email : (body.userEmail || ''),
+        userPhone: user ? user.phone : (body.userPhone || ''),
         amount: numAmount,
         currency: 'INR',
-        type: body.type || (body.planId ? 'subscription' : 'consultation'),
+        type: body.type || (body.planId ? 'subscription' : (body.purpose && body.purpose.toLowerCase().includes('wallet') ? 'wallet_topup' : 'consultation')),
         planId: body.planId || null,
         planName: body.planName || null,
-        purpose: body.purpose || (body.planName ? `Subscription: ${body.planName}` : 'Doctor Consultation'),
+        purpose: body.purpose || (body.planName ? `Subscription: ${body.planName}` : (body.type === 'wallet_topup' ? 'HealthPay Wallet Top-Up' : 'Doctor Consultation')),
         paymentMethod: body.paymentMethod || 'Razorpay',
         razorpayOrderId: orderId,
         razorpayPaymentId: paymentId,
@@ -566,7 +566,7 @@ export default async function handler(req, res) {
       if (body.type === 'subscription' || body.planId || (body.purpose && body.purpose.toLowerCase().includes('subscription'))) {
         activatedSub = addSubscription({
           userId: body.userId || 'u1',
-          userName: user ? user.name : 'Patient',
+          userName: user ? user.name : (body.userName || 'Patient'),
           planId: body.planId || 'plan_gold',
           planName: body.planName || 'Care Pass',
           price: numAmount,
@@ -574,6 +574,11 @@ export default async function handler(req, res) {
           razorpayPaymentId: paymentId,
           razorpayOrderId: orderId,
         });
+      }
+
+      let updatedWallet = null;
+      if (body.type === 'wallet_topup' || (body.purpose && body.purpose.toLowerCase().includes('wallet'))) {
+        updatedWallet = topupWallet(body.userId || (user ? user.id : 'u1'), numAmount, body.paymentMethod || 'Razorpay', paymentId);
       }
 
       return sendJson(res, 200, {
@@ -584,6 +589,7 @@ export default async function handler(req, res) {
         data: {
           payment: recordedPayment,
           subscription: activatedSub,
+          wallet: updatedWallet,
         },
       });
     }

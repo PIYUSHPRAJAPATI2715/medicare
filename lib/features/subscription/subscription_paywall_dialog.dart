@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../core/theme/app_colors.dart';
+import '../../models/subscription_plan_model.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/subscription_provider.dart';
+import '../../services/api_service.dart';
+import '../../services/razorpay_service.dart';
 
 class SubscriptionPaywallDialog extends ConsumerStatefulWidget {
   final VoidCallback onSubscribed;
@@ -44,6 +49,113 @@ class SubscriptionPaywallDialog extends ConsumerStatefulWidget {
 class _SubscriptionPaywallDialogState
     extends ConsumerState<SubscriptionPaywallDialog> {
   int _selectedIndex = 0;
+  late RazorpayService _razorpayService;
+  bool _isProcessingPayment = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _razorpayService = RazorpayService();
+    _razorpayService.init(
+      onSuccess: _handlePaymentSuccess,
+      onError: _handlePaymentError,
+    );
+  }
+
+  @override
+  void dispose() {
+    _razorpayService.dispose();
+    super.dispose();
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    final subState = ref.read(subscriptionProvider);
+    final plans = subState.availablePlans;
+    if (_selectedIndex >= plans.length) return;
+    final selectedPlan = plans[_selectedIndex];
+    final currentUser = ref.read(authProvider).user;
+
+    setState(() => _isProcessingPayment = true);
+
+    // 1. Record and verify payment in backend database
+    await ApiService.verifyPaymentSuccess(
+      orderId: response.orderId ?? 'ORD-SUB-${DateTime.now().millisecondsSinceEpoch}',
+      userId: currentUser.id,
+      amount: selectedPlan.price,
+      paymentId: response.paymentId ?? 'PAY-${DateTime.now().millisecondsSinceEpoch}',
+      paymentMethod: 'Razorpay UPI',
+      purpose: 'Subscription: ${selectedPlan.name}',
+      planId: selectedPlan.id,
+      planName: selectedPlan.name,
+      type: 'subscription',
+    );
+
+    // 2. Activate subscription in provider
+    ref.read(subscriptionProvider.notifier).activatePlan(
+      selectedPlan,
+      paymentMethod: 'Razorpay (${response.paymentId ?? "Live"})',
+    );
+
+    if (!mounted) return;
+    setState(() => _isProcessingPayment = false);
+
+    Navigator.pop(context);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFF0E9F6E),
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Payment Successful! ${selectedPlan.name} Activated.',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+
+    widget.onSubscribed();
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    if (!mounted) return;
+    setState(() => _isProcessingPayment = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.red.shade700,
+        content: Text('Payment cancelled or failed: ${response.message ?? "Unknown error"}'),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _startRazorpayCheckout(SubscriptionPlanModel selectedPlan) {
+    final currentUser = ref.read(authProvider).user;
+    setState(() => _isProcessingPayment = true);
+
+    _razorpayService.openCheckout(
+      amount: selectedPlan.price,
+      name: selectedPlan.name,
+      description: 'Care Plan Subscription - ${selectedPlan.name}',
+      userEmail: currentUser.email,
+      userPhone: currentUser.phone,
+      userName: currentUser.name,
+      notes: {
+        'planId': selectedPlan.id,
+        'planName': selectedPlan.name,
+        'userId': currentUser.id,
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -393,41 +505,9 @@ class _SubscriptionPaywallDialogState
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: () {
-                      ref
-                          .read(subscriptionProvider.notifier)
-                          .activatePlan(
-                            selectedPlan,
-                            paymentMethod: 'Razorpay UPI (rzp_test_TfulJJa1j5o9ge)',
-                          );
-
-                      Navigator.pop(context);
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: const Color(0xFF0E9F6E),
-                          content: Row(
-                            children: [
-                              const Icon(Icons.check_circle,
-                                  color: Colors.white),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  '${selectedPlan.name} Activated! Connecting now...',
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                            ],
-                          ),
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-
-                      // Automatically proceed with the original requested call/chat action!
-                      widget.onSubscribed();
-                    },
+                    onPressed: _isProcessingPayment
+                        ? null
+                        : () => _startRazorpayCheckout(selectedPlan),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       shape: RoundedRectangleBorder(
@@ -435,14 +515,23 @@ class _SubscriptionPaywallDialogState
                       ),
                       elevation: 2,
                     ),
-                    child: Text(
-                      'Subscribe & Connect Now (₹${selectedPlan.price.toStringAsFixed(0)})',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
+                    child: _isProcessingPayment
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            'Pay with Razorpay & Subscribe (₹${selectedPlan.price.toStringAsFixed(0)})',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 8),

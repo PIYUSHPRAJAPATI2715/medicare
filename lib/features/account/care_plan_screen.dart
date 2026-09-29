@@ -1,16 +1,135 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../core/theme/app_colors.dart';
+import '../../models/subscription_plan_model.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/subscription_provider.dart';
+import '../../services/api_service.dart';
+import '../../services/razorpay_service.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../subscription/subscription_paywall_dialog.dart';
 
-class CarePlanScreen extends ConsumerWidget {
+class CarePlanScreen extends ConsumerStatefulWidget {
   const CarePlanScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CarePlanScreen> createState() => _CarePlanScreenState();
+}
+
+class _CarePlanScreenState extends ConsumerState<CarePlanScreen> {
+  late RazorpayService _razorpayService;
+  SubscriptionPlanModel? _pendingPlan;
+  bool _isProcessing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _razorpayService = RazorpayService();
+    _razorpayService.init(
+      onSuccess: _handlePaymentSuccess,
+      onError: _handlePaymentError,
+    );
+  }
+
+  @override
+  void dispose() {
+    _razorpayService.dispose();
+    super.dispose();
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    final plan = _pendingPlan;
+    if (plan == null) return;
+    final currentUser = ref.read(authProvider).user;
+
+    setState(() => _isProcessing = true);
+
+    // 1. Record and verify payment in live admin database
+    await ApiService.verifyPaymentSuccess(
+      orderId: response.orderId ?? 'ORD-SUB-${DateTime.now().millisecondsSinceEpoch}',
+      userId: currentUser.id,
+      amount: plan.price,
+      paymentId: response.paymentId ?? 'PAY-${DateTime.now().millisecondsSinceEpoch}',
+      paymentMethod: 'Razorpay UPI',
+      purpose: 'Subscription: ${plan.name}',
+      planId: plan.id,
+      planName: plan.name,
+      type: 'subscription',
+    );
+
+    // 2. Activate plan in subscription provider
+    ref.read(subscriptionProvider.notifier).activatePlan(
+      plan,
+      paymentMethod: 'Razorpay (${response.paymentId ?? "Live"})',
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _isProcessing = false;
+      _pendingPlan = null;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFF0E9F6E),
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Payment Verified! ${plan.name} is now Active.',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    if (!mounted) return;
+    setState(() {
+      _isProcessing = false;
+      _pendingPlan = null;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.red.shade700,
+        content: Text('Payment cancelled or failed: ${response.message ?? "Unknown error"}'),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _startRazorpayForPlan(SubscriptionPlanModel plan) {
+    final currentUser = ref.read(authProvider).user;
+    setState(() {
+      _pendingPlan = plan;
+      _isProcessing = true;
+    });
+
+    _razorpayService.openCheckout(
+      amount: plan.price,
+      name: plan.name,
+      description: 'Care Plan Subscription - ${plan.name}',
+      userEmail: currentUser.email,
+      userPhone: currentUser.phone,
+      userName: currentUser.name,
+      notes: {
+        'planId': plan.id,
+        'planName': plan.name,
+        'userId': currentUser.id,
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final subState = ref.watch(subscriptionProvider);
     final activePlan = subState.activePlan;
     final isSubscribed = subState.isSubscribed;
@@ -278,28 +397,29 @@ class CarePlanScreen extends ConsumerWidget {
                         width: double.infinity,
                         height: 38,
                         child: OutlinedButton(
-                          onPressed: () {
-                            ref
-                                .read(subscriptionProvider.notifier)
-                                .activatePlan(plan);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                backgroundColor: const Color(0xFF0E9F6E),
-                                content: Text('${plan.name} Activated successfully!'),
-                              ),
-                            );
-                          },
+                          onPressed: _isProcessing
+                              ? null
+                              : () => _startRazorpayForPlan(plan),
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: AppColors.primary),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10)),
                           ),
-                          child: Text(
-                            'Activate ${plan.name}',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary),
-                          ),
+                          child: _isProcessing && _pendingPlan?.id == plan.id
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.primary,
+                                  ),
+                                )
+                              : Text(
+                                  'Pay with Razorpay (₹${plan.price.toStringAsFixed(0)})',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primary),
+                                ),
                         ),
                       )
                     else
