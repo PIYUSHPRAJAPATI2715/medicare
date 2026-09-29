@@ -143,8 +143,16 @@ class HomeScreen extends ConsumerWidget {
       backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 96),
+        child: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(allSpecialtiesProvider);
+            ref.invalidate(allDoctorsProvider);
+            ref.invalidate(allDiseasesProvider);
+            await ref.read(allSpecialtiesProvider.future);
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 96),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -458,7 +466,7 @@ class HomeScreen extends ConsumerWidget {
 
               const SizedBox(height: 14),
 
-              // 6 Specialties Grid (3x2)
+              // Specialties Grid (Dynamic)
               StaggeredFadeSlide(
                 index: 4,
                 child: Padding(
@@ -466,7 +474,7 @@ class HomeScreen extends ConsumerWidget {
                   child: GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: specialties.take(6).length,
+                    itemCount: specialties.length,
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 3,
                       childAspectRatio: 0.95,
@@ -785,8 +793,9 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildMajorConsultationCard({
     required String title,

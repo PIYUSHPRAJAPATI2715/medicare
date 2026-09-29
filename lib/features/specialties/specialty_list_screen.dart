@@ -110,71 +110,77 @@ class _SpecialtyListScreenState extends ConsumerState<SpecialtyListScreen>
                         title: 'No Specialities Found',
                         message: 'Try searching for common symptoms or different specialty names.',
                       )
-                    : ListView.separated(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        itemCount: specialties.length,
-                        separatorBuilder: (context, index) => const Divider(
-                          height: 1,
-                          indent: 78,
-                          endIndent: 20,
-                          color: AppColors.borderLight,
-                        ),
-                        itemBuilder: (context, index) {
-                          final item = specialties[index];
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                            leading: Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: item.bgColor,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(item.icon, color: item.iconColor, size: 24),
-                            ),
-                            title: Text(
-                              item.name,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 2),
-                                Text(
-                                  item.description,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${item.doctorCount} Doctors available',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            trailing: const Icon(
-                              Icons.arrow_forward_ios_rounded,
-                              size: 14,
-                              color: AppColors.textTertiary,
-                            ),
-                            onTap: () {
-                              ref.read(doctorFilterProvider.notifier).setSpecialty(item.name);
-                              Navigator.of(context).pushNamed(AppRoutes.doctorList);
-                            },
-                          );
+                    : RefreshIndicator(
+                        onRefresh: () async {
+                          ref.invalidate(allSpecialtiesProvider);
+                          await ref.read(allSpecialtiesProvider.future);
                         },
+                        child: ListView.separated(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          itemCount: specialties.length,
+                          separatorBuilder: (context, index) => const Divider(
+                            height: 1,
+                            indent: 78,
+                            endIndent: 20,
+                            color: AppColors.borderLight,
+                          ),
+                          itemBuilder: (context, index) {
+                            final item = specialties[index];
+                            return ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                              leading: Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: item.bgColor,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(item.icon, color: item.iconColor, size: 24),
+                              ),
+                              title: Text(
+                                item.name,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    item.description,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${item.doctorCount} Doctors available',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              trailing: const Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 14,
+                                color: AppColors.textTertiary,
+                              ),
+                              onTap: () {
+                                ref.read(doctorFilterProvider.notifier).setSpecialty(item.name);
+                                Navigator.of(context).pushNamed(AppRoutes.doctorList);
+                              },
+                            );
+                          },
+                        ),
                       ),
 
                 // Tab 2: Diseases & Symptoms
@@ -184,7 +190,12 @@ class _SpecialtyListScreenState extends ConsumerState<SpecialtyListScreen>
                         title: 'No Diseases Found',
                         message: 'Check your search query or consult a general physician.',
                       )
-                    : ListView.separated(
+                    : RefreshIndicator(
+                        onRefresh: () async {
+                          ref.invalidate(allDiseasesProvider);
+                          await ref.read(allDiseasesProvider.future);
+                        },
+                        child: ListView.separated(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         itemCount: filteredDiseases.length,
                         separatorBuilder: (context, index) => const Divider(
@@ -262,6 +273,7 @@ class _SpecialtyListScreenState extends ConsumerState<SpecialtyListScreen>
                           );
                         },
                       ),
+                    ),
               ],
             ),
           ),
