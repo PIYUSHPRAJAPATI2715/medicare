@@ -294,9 +294,9 @@ class _DoctorRegistrationScreenState
       final picker = ImagePicker();
       final picked = await picker.pickImage(
         source: source,
-        maxWidth: 1920,
-        maxHeight: 1920,
-        imageQuality: 85,
+        maxWidth: 600,
+        maxHeight: 600,
+        imageQuality: 50,
       );
       if (picked != null) {
         final bytes = await picked.readAsBytes();
@@ -747,15 +747,19 @@ class _DoctorRegistrationScreenState
       String getDocDataUrl(String docKey, String fallback) {
         final doc = _uploadedDocs[docKey];
         if (doc != null && doc.fileBytes != null && doc.fileBytes!.isNotEmpty) {
-          final mime = doc.isPdf ? 'application/pdf' : 'image/jpeg';
-          return 'data:$mime;base64,${base64Encode(doc.fileBytes!)}';
+          if (doc.fileBytes!.length <= 250 * 1024) {
+            final mime = doc.isPdf ? 'application/pdf' : 'image/jpeg';
+            return 'data:$mime;base64,${base64Encode(doc.fileBytes!)}';
+          }
         }
         return fallback;
       }
 
       String getPhotoUrl() {
         if (_profilePhoto != null && _profilePhoto!.fileBytes != null && _profilePhoto!.fileBytes!.isNotEmpty) {
-          return 'data:image/jpeg;base64,${base64Encode(_profilePhoto!.fileBytes!)}';
+          if (_profilePhoto!.fileBytes!.length <= 250 * 1024) {
+            return 'data:image/jpeg;base64,${base64Encode(_profilePhoto!.fileBytes!)}';
+          }
         }
         return 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400';
       }
