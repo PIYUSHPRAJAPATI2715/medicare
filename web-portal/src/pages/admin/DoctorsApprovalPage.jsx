@@ -166,6 +166,13 @@ export default function DoctorsApprovalPage() {
 
   useEffect(() => {
     loadData();
+    const interval = setInterval(loadData, 4000);
+    const onFocus = () => loadData();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   const loadData = async () => {
@@ -173,11 +180,9 @@ export default function DoctorsApprovalPage() {
       const docRes = await fetchDoctors();
       if (docRes && docRes.data && Array.isArray(docRes.data) && docRes.data.length > 0) {
         setDoctors(prev => {
-          const customIds = new Set(prev.filter(d => d.id.startsWith('custom_')).map(d => d.id));
-          const customs = prev.filter(d => customIds.has(d.id));
-          const existingIds = new Set(customs.map(d => d.id));
-          const incoming = docRes.data.filter(d => !existingIds.has(d.id));
-          return [...customs, ...incoming];
+          const serverDocIds = new Set(docRes.data.map(d => d.id));
+          const customs = prev.filter(d => d.id.startsWith('custom_') && !serverDocIds.has(d.id));
+          return [...customs, ...docRes.data];
         });
       }
     } catch (e) {
