@@ -2,8 +2,9 @@
   "name": "medicare-plus-monorepo",
   "private": true,
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
-    "build": "cd web-portal && npm install && npm run build",
+    "build": "if [ -d \"web-portal\" ]; then (cd web-portal && npm run build); else npm run build; fi",
     "start": "cd backend && npm start"
   }
 }

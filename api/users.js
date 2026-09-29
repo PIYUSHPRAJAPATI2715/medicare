@@ -1,4 +1,4 @@
-import { initialUsers } from './data.js';
+import { getUsers, getUserById, addUser, updateUser, deleteUser } from './store.js';
 
 export default function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -14,10 +14,11 @@ export default function handler(req, res) {
   // GET: single user by ID or all users
   if (req.method === 'GET') {
     if (id) {
-      const user = initialUsers.find(u => u.id === id);
+      const user = getUserById(id);
       if (!user) {
         return res.status(404).json({
           status: 404,
+          statusCode: 404,
           success: false,
           message: 'User profile not found',
           data: null,
@@ -25,18 +26,21 @@ export default function handler(req, res) {
       }
       return res.status(200).json({
         status: 200,
+        statusCode: 200,
         success: true,
         message: 'User profile retrieved successfully',
         data: { user },
       });
     }
 
+    const allUsers = getUsers();
     return res.status(200).json({
       status: 200,
+      statusCode: 200,
       success: true,
       message: 'Users list retrieved successfully',
-      count: initialUsers.length,
-      data: initialUsers,
+      count: allUsers.length,
+      data: allUsers,
     });
   }
 
@@ -45,29 +49,30 @@ export default function handler(req, res) {
     if (!id) {
       return res.status(400).json({
         status: 400,
+        statusCode: 400,
         success: false,
         message: 'User ID is required for updating profile',
         data: null,
       });
     }
 
-    const idx = initialUsers.findIndex(u => u.id === id);
-    if (idx === -1) {
+    const updated = updateUser(id, req.body || {});
+    if (!updated) {
       return res.status(404).json({
         status: 404,
+        statusCode: 404,
         success: false,
         message: 'User not found to update',
         data: null,
       });
     }
 
-    initialUsers[idx] = { ...initialUsers[idx], ...req.body, id };
-
     return res.status(200).json({
       status: 200,
+      statusCode: 200,
       success: true,
       message: 'User profile updated successfully',
-      data: initialUsers[idx],
+      data: updated,
     });
   }
 
@@ -76,31 +81,29 @@ export default function handler(req, res) {
     if (!id) {
       return res.status(400).json({
         status: 400,
+        statusCode: 400,
         success: false,
         message: 'User ID is required for deleting account',
         data: null,
       });
     }
 
-    const idx = initialUsers.findIndex(u => u.id === id);
-    if (idx !== -1) {
-      initialUsers.splice(idx, 1);
-    }
-
+    const ok = deleteUser(id);
     return res.status(200).json({
       status: 200,
+      statusCode: 200,
       success: true,
-      message: 'User account deleted successfully',
+      message: ok ? 'User account deleted successfully' : 'User removed from directory',
       data: { id, deleted: true },
     });
   }
 
-  // POST: create user
+  // POST: create user / register
   if (req.method === 'POST') {
-    const newUser = { id: `u_${Date.now()}`, ...req.body };
-    initialUsers.unshift(newUser);
+    const newUser = addUser(req.body || {});
     return res.status(201).json({
       status: 201,
+      statusCode: 201,
       success: true,
       message: 'User created successfully',
       data: newUser,
@@ -109,6 +112,7 @@ export default function handler(req, res) {
 
   return res.status(405).json({
     status: 405,
+    statusCode: 405,
     success: false,
     message: 'Method not allowed',
     data: null,

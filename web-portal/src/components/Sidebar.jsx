@@ -15,6 +15,7 @@ import {
   ClipboardList,
   CreditCard,
   FileText,
+  DollarSign,
   X
 } from 'lucide-react';
 
@@ -24,6 +25,7 @@ export default function Sidebar({ isMobileOpen, onCloseMobile }) {
 
   const adminNav = [
     { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+    { name: 'Payments & Revenue', path: '/admin/payments', icon: DollarSign, badge: 'Razorpay' },
     { name: 'Subscription Plans', path: '/admin/plans', icon: CreditCard, badge: 'Paywall' },
     { name: 'Prescriptions & Rx', path: '/admin/prescriptions', icon: FileText, badge: 'Tablets' },
     { name: 'Doctors & Approvals', path: '/admin/doctors', icon: UserCheck, badge: 'New Doc Verification' },

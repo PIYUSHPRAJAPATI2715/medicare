@@ -1,4 +1,4 @@
-import { initialUsers, initialDoctors } from './data.js';
+import { getUsers, getDoctors, getUserSubscription } from './store.js';
 
 export default function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,100 +22,141 @@ export default function handler(req, res) {
   const cleanInput = String(emailOrPhone).trim().toLowerCase().replace(/[\s-]/g, '');
   const targetRole = role ? String(role).toLowerCase() : '';
 
+  const users = getUsers();
+  const doctors = getDoctors({ all: 'true' });
+
   // 1. Doctor Login
   if (targetRole === 'doctor' || cleanInput.includes('rajesh') || cleanInput.includes('doctor')) {
-    const doctor = initialDoctors.find(d => {
+    const doctor = doctors.find(d => {
       const dPhone = (d.phone || '').replace(/[\s-]/g, '').toLowerCase();
       const dEmail = (d.email || '').toLowerCase();
       const dName = (d.name || '').toLowerCase();
-      const dId = (d.id || '').toLowerCase();
-      return (dPhone.length > 5 && (dPhone.includes(cleanInput) || cleanInput.includes(dPhone))) ||
-             (dEmail.length > 3 && dEmail.includes(cleanInput)) ||
-             dName.includes(cleanInput) ||
-             dId === cleanInput;
-    }) || (targetRole === 'doctor' ? initialDoctors[0] : null);
+      return (dEmail && dEmail.includes(cleanInput)) ||
+             (dPhone && dPhone.includes(cleanInput)) ||
+             (dName && dName.includes(cleanInput));
+    });
 
-    if (!doctor) {
-      return res.status(404).json({
-        status: 404,
-        statusCode: 404,
-        success: false,
-        message: `Doctor account not found with: ${emailOrPhone}`,
-        data: null,
-      });
-    }
-
-    if (doctor.verificationStatus === 'pending' || !doctor.isVerified) {
-      return res.status(403).json({
-        status: 403,
-        statusCode: 403,
-        success: false,
-        message: 'Your doctor profile is under verification. Credential review in progress.',
+    if (doctor) {
+      return res.status(200).json({
+        status: 200,
+        statusCode: 200,
+        success: true,
+        message: 'Doctor authentication successful',
         data: {
-          status: 'pending',
-          isVerified: false,
-          doctor,
+          token: `jwt_doctor_${doctor.id}`,
+          role: 'doctor',
+          user: {
+            id: doctor.id,
+            name: doctor.name,
+            email: doctor.email || 'dr.specialist@drconnects24.com',
+            phone: doctor.phone || '+91 98290 11223',
+            role: 'doctor',
+            status: doctor.isVerified ? 'active' : 'pending_verification',
+            doctorId: doctor.id,
+            isVerified: doctor.isVerified,
+            specialty: doctor.specialty,
+            avatarUrl: doctor.imageUrl,
+          },
         },
       });
     }
+  }
 
+  // 2. Admin Login
+  if (targetRole === 'admin' || cleanInput.includes('admin')) {
+    const adminUser = users.find(u => u.role === 'admin') || {
+      id: 'u6',
+      name: 'System Admin',
+      email: 'admin@drconnects24.com',
+      phone: '+91 99000 00000',
+      role: 'admin',
+      status: 'active',
+      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+    };
+
+    return res.status(200).json({
+      status: 200,
+      statusCode: 200,
+      success: true,
+      message: 'Admin authentication successful',
+      data: {
+        token: `jwt_admin_${adminUser.id}`,
+        role: 'admin',
+        user: adminUser,
+      },
+    });
+  }
+
+  // 3. Patient Login (Check live users first)
+  const user = users.find(u => {
+    const uPhone = (u.phone || '').replace(/[\s-]/g, '').toLowerCase();
+    const uEmail = (u.email || '').toLowerCase();
+    const uName = (u.name || '').toLowerCase();
+    return (uEmail && uEmail === cleanInput) ||
+           (uPhone && uPhone === cleanInput) ||
+           (cleanInput.length >= 6 && uPhone.includes(cleanInput)) ||
+           (cleanInput.length >= 4 && uName.includes(cleanInput));
+  });
+
+  if (user) {
+    const activeSub = getUserSubscription(user.id);
+    return res.status(200).json({
+      status: 200,
+      statusCode: 200,
+      success: true,
+      message: 'Patient login successful',
+      data: {
+        token: `jwt_live_${user.id}`,
+        role: user.role || 'patient',
+        user: {
+          ...user,
+          hasActiveCarePlan: !!activeSub,
+          activePlanName: activeSub ? activeSub.planName : user.activePlanName,
+          consultationsRemaining: activeSub ? activeSub.consultationsRemaining : user.consultationsRemaining,
+        },
+        subscription: activeSub,
+      },
+    });
+  }
+
+  // 4. Doctor matched as fallback
+  const fallbackDoctor = doctors.find(d => {
+    const dPhone = (d.phone || '').replace(/[\s-]/g, '').toLowerCase();
+    const dEmail = (d.email || '').toLowerCase();
+    return (dEmail && dEmail === cleanInput) || (dPhone && dPhone === cleanInput);
+  });
+
+  if (fallbackDoctor) {
     return res.status(200).json({
       status: 200,
       statusCode: 200,
       success: true,
       message: 'Doctor login successful',
       data: {
-        token: `jwt_live_doc_${doctor.id}`,
+        token: `jwt_doctor_${fallbackDoctor.id}`,
+        role: 'doctor',
         user: {
-          id: doctor.id,
-          name: doctor.name,
-          email: doctor.email || `${doctor.id}@drconnects24.com`,
-          phone: doctor.phone || '+91 98290 11223',
+          id: fallbackDoctor.id,
+          name: fallbackDoctor.name,
+          email: fallbackDoctor.email || 'dr.specialist@drconnects24.com',
+          phone: fallbackDoctor.phone || '+91 98290 11223',
           role: 'doctor',
-          avatarUrl: doctor.imageUrl,
-          specialty: doctor.specialty,
-          isVerified: doctor.isVerified,
-          verificationStatus: doctor.verificationStatus,
+          status: fallbackDoctor.isVerified ? 'active' : 'pending_verification',
+          doctorId: fallbackDoctor.id,
+          isVerified: fallbackDoctor.isVerified,
+          specialty: fallbackDoctor.specialty,
+          avatarUrl: fallbackDoctor.imageUrl,
         },
       },
     });
   }
 
-  // 2. Patient / Admin Login
-  const user = initialUsers.find(u => {
-    const uPhone = (u.phone || '').replace(/[\s-]/g, '').toLowerCase();
-    const uEmail = (u.email || '').toLowerCase();
-    return (uPhone.length > 5 && (uPhone.includes(cleanInput) || cleanInput.includes(uPhone))) ||
-           (uEmail.length > 3 && (uEmail === cleanInput || uEmail.includes(cleanInput)));
-  });
-
-  if (!user) {
-    return res.status(404).json({
-      status: 404,
-      statusCode: 404,
-      success: false,
-      message: `Account not found with phone/email: ${emailOrPhone}. Please register.`,
-      data: null,
-    });
-  }
-
-  return res.status(200).json({
-    status: 200,
-    statusCode: 200,
-    success: true,
-    message: 'Login successful',
-    data: {
-      token: `jwt_live_${user.id}`,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role || targetRole || 'patient',
-        status: user.status || 'active',
-        avatarUrl: user.avatarUrl,
-        currentCity: user.currentCity || 'Jaipur',
-      },
-    },
+  // Invalid Credentials
+  return res.status(401).json({
+    status: 401,
+    statusCode: 401,
+    success: false,
+    message: 'Invalid credentials. User not found. Please register.',
+    data: null,
   });
 }

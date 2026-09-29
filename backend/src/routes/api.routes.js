@@ -66,6 +66,8 @@ router.post('/wallet/topup', adminController.topupWallet);
 router.post('/wallet/pay', adminController.payWithWallet);
 
 // --- PAYMENTS & GATEWAY INTEGRATION ---
+router.get('/payments', adminController.getPayments);
+router.post('/payments', adminController.createPaymentOrder);
 router.post('/payments/create-order', adminController.createPaymentOrder);
 router.post('/payments/verify-success', adminController.verifyPaymentSuccess);
 

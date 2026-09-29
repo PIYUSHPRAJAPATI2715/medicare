@@ -1,97 +1,81 @@
-const defaultPlans = [
-  {
-    id: 'plan_starter',
-    name: 'Starter Care Pass',
-    tagline: 'Ideal for immediate doctor consultation & quick recovery',
-    price: 199,
-    originalPrice: 499,
-    durationDays: 30,
-    durationLabel: '1 Month',
-    consultationLimit: 3,
-    isPopular: false,
-    badgeText: 'AFFORDABLE',
-    isActive: true,
-    subscribersCount: 1420,
-    features: [
-      '3 Video or Audio Consultations with top doctors',
-      '24/7 Unlimited Doctor Chat & Follow-ups',
-      'Official Digital Prescriptions with instant download',
-      '10% Flat Discount on all pharmacy tablet orders',
-      'Free home medicine delivery on orders above ₹199'
-    ]
-  },
-  {
-    id: 'plan_gold',
-    name: 'Gold Family Shield',
-    tagline: 'Complete year-round coverage for up to 4 family members',
-    price: 699,
-    originalPrice: 1999,
-    durationDays: 180,
-    durationLabel: '6 Months',
-    consultationLimit: -1,
-    isPopular: true,
-    badgeText: 'MOST POPULAR',
-    isActive: true,
-    subscribersCount: 3840,
-    features: [
-      'Unlimited 24/7 Video & Audio Consultations',
-      'Direct connection to MD Specialists & Super-specialists',
-      'Family coverage for up to 4 family profiles',
-      'Instant Electronic Rx with Priority Pharmacy Dispatch',
-      '20% Off all prescribed tablets & medicines',
-      'Priority 2-hour doorstep tablet delivery',
-      '₹0 Convenience fees on all appointments'
-    ]
-  },
-  {
-    id: 'plan_platinum',
-    name: 'Platinum 365 SuperCare',
-    tagline: 'Premium VIP medical access, full health checkups & 1-year coverage',
-    price: 1299,
-    originalPrice: 3499,
-    durationDays: 365,
-    durationLabel: '1 Year',
-    consultationLimit: -1,
-    isPopular: false,
-    badgeText: 'BEST VALUE',
-    isActive: true,
-    subscribersCount: 2150,
-    features: [
-      'Unlimited Consultations for the entire year (365 Days)',
-      'Full Comprehensive Annual Health Checkup Included (62 Tests)',
-      'VIP Priority Doctor Routing within 60 seconds',
-      'Dedicated Personal Health Care Manager',
-      '25% Off on all prescribed medicines & diagnostic tests',
-      'Free doorstep sample collection & free express delivery'
-    ]
-  }
-];
+import { getStore, saveStore } from './store.js';
 
 export default function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(204).end();
+
+  const store = getStore();
+  const id = req.query.id || req.body?.id;
 
   if (req.method === 'POST') {
-    const newPlan = { id: `plan_${Date.now()}`, ...req.body };
-    defaultPlans.push(newPlan);
+    const newPlan = {
+      id: req.body?.id || `plan_${Date.now()}`,
+      name: req.body?.name || 'New Care Plan',
+      tagline: req.body?.tagline || 'Comprehensive medical coverage',
+      price: Number(req.body?.price) || 199,
+      originalPrice: Number(req.body?.originalPrice) || 499,
+      durationDays: Number(req.body?.durationDays) || 30,
+      durationLabel: req.body?.durationLabel || '1 Month',
+      consultationLimit: Number(req.body?.consultationLimit) || 3,
+      isPopular: !!req.body?.isPopular,
+      badgeText: req.body?.badgeText || 'POPULAR',
+      isActive: req.body?.isActive ?? true,
+      subscribersCount: 0,
+      features: req.body?.features || [
+        'Video or Audio Consultations with specialists',
+        '24/7 Unlimited Doctor Chat',
+        'Digital Prescriptions',
+      ],
+    };
+
+    store.plans.push(newPlan);
+    saveStore(store);
+
     return res.status(201).json({
       status: 201,
+      statusCode: 201,
       success: true,
       message: 'Care plan created successfully',
       data: newPlan,
     });
   }
 
+  if (req.method === 'PUT' && id) {
+    const idx = store.plans.findIndex(p => p.id === id);
+    if (idx !== -1) {
+      store.plans[idx] = { ...store.plans[idx], ...req.body, id };
+      saveStore(store);
+      return res.status(200).json({
+        status: 200,
+        statusCode: 200,
+        success: true,
+        message: 'Care plan updated',
+        data: store.plans[idx],
+      });
+    }
+  }
+
+  if (req.method === 'DELETE' && id) {
+    store.plans = store.plans.filter(p => p.id !== id);
+    saveStore(store);
+    return res.status(200).json({
+      status: 200,
+      statusCode: 200,
+      success: true,
+      message: 'Care plan deleted',
+      data: { id, deleted: true },
+    });
+  }
+
   return res.status(200).json({
     status: 200,
+    statusCode: 200,
     success: true,
     message: 'Care plans retrieved successfully',
-    count: defaultPlans.length,
-    data: defaultPlans,
+    count: store.plans.length,
+    data: store.plans,
   });
 }

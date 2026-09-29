@@ -24,6 +24,7 @@ class SubscriptionState {
   bool get isSubscribed {
     if (activePlan == null) return false;
     if (expiresAt != null && expiresAt!.isBefore(DateTime.now())) return false;
+    if (!activePlan!.isUnlimited && remainingConsultations <= 0) return false;
     return true;
   }
 

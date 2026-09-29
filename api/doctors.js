@@ -1,23 +1,24 @@
-import { initialDoctors } from './data.js';
+import { getDoctors, addDoctor, verifyDoctor, getStore, saveStore } from './store.js';
 
 export default function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(204).end();
 
   const id = req.query.id || req.body?.id;
+  const isPending = req.query.pending === 'true' || req.url.includes('/pending');
 
-  // GET: single doctor or all doctors
+  // GET: Doctors list or single doctor
   if (req.method === 'GET') {
     if (id) {
-      const doctor = initialDoctors.find(d => d.id === id);
-      if (!doctor) {
+      const doctors = getDoctors({ all: 'true' });
+      const doc = doctors.find(d => d.id === id);
+      if (!doc) {
         return res.status(404).json({
           status: 404,
+          statusCode: 404,
           success: false,
           message: 'Doctor not found',
           data: null,
@@ -25,130 +26,136 @@ export default function handler(req, res) {
       }
       return res.status(200).json({
         status: 200,
+        statusCode: 200,
         success: true,
-        message: 'Doctor details retrieved successfully',
-        data: doctor,
+        message: 'Doctor profile retrieved',
+        data: { doctor: doc },
       });
     }
 
-    const { status, specialty, all } = req.query;
-    let list = [...initialDoctors];
-
-    if (all !== 'true' && !status) {
-      // By default return approved doctors for app users
-      list = list.filter(d => d.isVerified && d.verificationStatus === 'approved');
-    } else if (status) {
-      list = list.filter(d => d.verificationStatus === status);
+    if (isPending) {
+      const pendingList = getDoctors({ pending: 'true' });
+      return res.status(200).json({
+        status: 200,
+        statusCode: 200,
+        success: true,
+        count: pendingList.length,
+        message: 'Pending doctor approvals retrieved',
+        data: pendingList,
+      });
     }
 
-    if (specialty) {
-      list = list.filter(d => d.specialty.toLowerCase() === specialty.toLowerCase());
-    }
-
+    const docList = getDoctors(req.query);
     return res.status(200).json({
       status: 200,
+      statusCode: 200,
       success: true,
+      count: docList.length,
       message: 'Doctors list retrieved successfully',
-      count: list.length,
-      data: list,
+      data: docList,
     });
   }
 
-  // PUT: update or verify doctor
+  // PUT: Verify or Update Doctor
   if (req.method === 'PUT') {
     if (!id) {
       return res.status(400).json({
         status: 400,
+        statusCode: 400,
         success: false,
-        message: 'Doctor ID is required for update',
+        message: 'Doctor ID is required for update or verification',
         data: null,
       });
     }
 
-    const idx = initialDoctors.findIndex(d => d.id === id);
+    const { status, action, notes, rejectionNotes } = req.body || {};
+    const effectiveAction = action || (status === 'approved' ? 'approve' : (status === 'rejected' ? 'reject' : null));
+
+    if (effectiveAction) {
+      const updated = verifyDoctor(id, effectiveAction, notes || rejectionNotes);
+      if (!updated) {
+        return res.status(404).json({
+          status: 404,
+          statusCode: 404,
+          success: false,
+          message: 'Doctor not found to verify',
+          data: null,
+        });
+      }
+      return res.status(200).json({
+        status: 200,
+        statusCode: 200,
+        success: true,
+        message: `Doctor status updated to ${updated.verificationStatus}`,
+        data: updated,
+      });
+    }
+
+    // General update
+    const store = getStore();
+    const idx = store.doctors.findIndex(d => d.id === id);
     if (idx === -1) {
       return res.status(404).json({
         status: 404,
+        statusCode: 404,
         success: false,
-        message: 'Doctor not found to update',
+        message: 'Doctor not found',
         data: null,
       });
     }
 
-    const { action, rejectionReason } = req.body || {};
-
-    if (action === 'approve') {
-      initialDoctors[idx].isVerified = true;
-      initialDoctors[idx].verificationStatus = 'approved';
-      initialDoctors[idx].rejectionReason = null;
-      return res.status(200).json({
-        status: 200,
-        success: true,
-        message: `Doctor ${initialDoctors[idx].name} verified and approved successfully!`,
-        data: initialDoctors[idx],
-      });
-    }
-
-    if (action === 'reject') {
-      initialDoctors[idx].isVerified = false;
-      initialDoctors[idx].verificationStatus = 'rejected';
-      initialDoctors[idx].rejectionReason = rejectionReason || 'Incomplete credentials';
-      return res.status(200).json({
-        status: 200,
-        success: true,
-        message: `Doctor ${initialDoctors[idx].name} registration rejected.`,
-        data: initialDoctors[idx],
-      });
-    }
-
-    initialDoctors[idx] = { ...initialDoctors[idx], ...req.body, id };
+    store.doctors[idx] = { ...store.doctors[idx], ...req.body, id };
+    saveStore(store);
 
     return res.status(200).json({
       status: 200,
+      statusCode: 200,
       success: true,
-      message: 'Doctor updated successfully',
-      data: initialDoctors[idx],
+      message: 'Doctor profile updated successfully',
+      data: store.doctors[idx],
     });
   }
 
-  // DELETE: delete doctor
+  // POST: Add new doctor
+  if (req.method === 'POST') {
+    const newDoc = addDoctor(req.body || {});
+    return res.status(201).json({
+      status: 201,
+      statusCode: 201,
+      success: true,
+      message: 'Doctor added successfully',
+      data: newDoc,
+    });
+  }
+
+  // DELETE: Delete doctor
   if (req.method === 'DELETE') {
     if (!id) {
       return res.status(400).json({
         status: 400,
+        statusCode: 400,
         success: false,
-        message: 'Doctor ID is required for deletion',
+        message: 'Doctor ID is required',
         data: null,
       });
     }
 
-    const idx = initialDoctors.findIndex(d => d.id === id);
-    if (idx !== -1) {
-      initialDoctors.splice(idx, 1);
-    }
+    const store = getStore();
+    store.doctors = store.doctors.filter(d => d.id !== id);
+    saveStore(store);
 
     return res.status(200).json({
       status: 200,
+      statusCode: 200,
       success: true,
-      message: 'Doctor removed successfully from MediCare+',
+      message: 'Doctor deleted successfully',
       data: { id, deleted: true },
-    });
-  }
-
-  // POST: create doctor
-  if (req.method === 'POST') {
-    const newDoc = { id: `d_${Date.now()}`, ...req.body };
-    initialDoctors.unshift(newDoc);
-    return res.status(201).json({
-      status: 201,
-      success: true,
-      message: 'Doctor created successfully',
-      data: newDoc,
     });
   }
 
   return res.status(405).json({
     status: 405,
+    statusCode: 405,
     success: false,
     message: 'Method not allowed',
     data: null,

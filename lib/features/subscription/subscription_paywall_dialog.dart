@@ -396,7 +396,10 @@ class _SubscriptionPaywallDialogState
                     onPressed: () {
                       ref
                           .read(subscriptionProvider.notifier)
-                          .activatePlan(selectedPlan);
+                          .activatePlan(
+                            selectedPlan,
+                            paymentMethod: 'Razorpay UPI (rzp_test_TfulJJa1j5o9ge)',
+                          );
 
                       Navigator.pop(context);
 

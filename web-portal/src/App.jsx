@@ -15,6 +15,7 @@ import AppointmentsPage from './pages/admin/AppointmentsPage';
 import SettingsPage from './pages/admin/SettingsPage';
 import SubscriptionPlansPage from './pages/admin/SubscriptionPlansPage';
 import PrescriptionsManagementPage from './pages/admin/PrescriptionsManagementPage';
+import PaymentsPage from './pages/admin/PaymentsPage';
 
 // Doctor Pages
 import DoctorDashboardPage from './pages/doctor/DoctorDashboardPage';
@@ -67,6 +68,7 @@ export default function App() {
 
           {/* Admin Routes */}
           <Route path="/admin/dashboard" element={<ProtectedLayout requiredRole="admin"><AdminDashboardPage /></ProtectedLayout>} />
+          <Route path="/admin/payments" element={<ProtectedLayout requiredRole="admin"><PaymentsPage /></ProtectedLayout>} />
           <Route path="/admin/plans" element={<ProtectedLayout requiredRole="admin"><SubscriptionPlansPage /></ProtectedLayout>} />
           <Route path="/admin/prescriptions" element={<ProtectedLayout requiredRole="admin"><PrescriptionsManagementPage /></ProtectedLayout>} />
           <Route path="/admin/doctors" element={<ProtectedLayout requiredRole="admin"><DoctorsApprovalPage /></ProtectedLayout>} />

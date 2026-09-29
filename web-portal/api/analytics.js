@@ -1,15 +1,19 @@
-import { initialUsers, initialDoctors, initialAppointments } from './data.js';
+import { getAnalytics } from './store.js';
 
 export default function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') return res.status(204).end();
+
+  const data = getAnalytics();
+
   return res.status(200).json({
+    status: 200,
+    statusCode: 200,
     success: true,
-    data: {
-      totalUsers: initialUsers.length,
-      totalDoctors: initialDoctors.length,
-      pendingVerifications: initialDoctors.filter(d => !d.isVerified).length,
-      totalAppointments: initialAppointments.length,
-      revenueTotal: 124500,
-    },
+    message: 'System analytics data retrieved',
+    data,
   });
 }

@@ -827,8 +827,41 @@ exports.payWithWallet = (req, res) => {
 };
 
 // --- PAYMENTS & ORDERS ---
+exports.getPayments = (req, res) => {
+  if (!db.payments) {
+    db.payments = [
+      {
+        id: 'pay_init_1',
+        userId: 'u1',
+        userName: 'Piyush Prajapati',
+        userEmail: 'piyush@example.com',
+        userPhone: '+91 98765 43210',
+        amount: 699,
+        currency: 'INR',
+        type: 'subscription',
+        planId: 'plan_gold',
+        planName: 'Gold Family Shield',
+        purpose: 'Care Plan Subscription - 6 Months',
+        paymentMethod: 'Razorpay UPI',
+        razorpayOrderId: 'order_init_101',
+        razorpayPaymentId: 'pay_test_gold_101',
+        status: 'captured',
+        createdAt: new Date().toISOString(),
+      }
+    ];
+  }
+  res.json({
+    status: 200,
+    statusCode: 200,
+    success: true,
+    count: db.payments.length,
+    data: db.payments,
+    razorpayKeyId: 'rzp_test_TfulJJa1j5o9ge',
+  });
+};
+
 exports.createPaymentOrder = (req, res) => {
-  const { userId, amount, purpose } = req.body;
+  const { userId, amount, purpose, planId, planName } = req.body;
   const numAmount = Number(amount) || 499;
   const orderId = `order_${Date.now()}`;
 

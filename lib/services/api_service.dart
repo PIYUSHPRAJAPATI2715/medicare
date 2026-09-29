@@ -936,54 +936,66 @@ static Future<Map<String, dynamic>> payWithWallet({
 
 /// Create Payment Order
 static Future<Map<String, dynamic>> createPaymentOrder({
-required String userId,
-required double amount,
-String purpose = 'Consultation Fee',
+  required String userId,
+  required double amount,
+  String purpose = 'Consultation Fee',
+  String? planId,
+  String? planName,
 }) async {
-try {
-final res = await _request((url) => http.post(
-Uri.parse('$url/payments/create-order'),
-headers: {'Content-Type': 'application/json'},
-body: jsonEncode({
-'userId': userId,
-'amount': amount,
-'purpose': purpose,
-}),
-));
-return jsonDecode(res.body);
-} catch (e) {
-debugPrint('ApiService createPaymentOrder error: $e');
-return _errorResponse(e);
-}
+  try {
+    final res = await _request((url) => http.post(
+      Uri.parse('$url/payments?action=create-order'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'action': 'create-order',
+        'userId': userId,
+        'amount': amount,
+        'purpose': purpose,
+        'planId': planId,
+        'planName': planName,
+      }),
+    ), endpoint: '/payments?action=create-order');
+    return jsonDecode(res.body);
+  } catch (e) {
+    debugPrint('ApiService createPaymentOrder error: $e');
+    return _errorResponse(e);
+  }
 }
 
 /// Verify Payment Success
 static Future<Map<String, dynamic>> verifyPaymentSuccess({
-required String orderId,
-required String userId,
-required double amount,
-required String paymentId,
-String purpose = 'Doctor Consultation',
-String paymentMethod = 'UPI',
+  required String orderId,
+  required String userId,
+  required double amount,
+  required String paymentId,
+  String purpose = 'Doctor Consultation',
+  String paymentMethod = 'UPI',
+  String? planId,
+  String? planName,
+  String? type,
 }) async {
-try {
-final res = await _request((url) => http.post(
-Uri.parse('$url/payments/verify-success'),
-headers: {'Content-Type': 'application/json'},
-body: jsonEncode({
-'orderId': orderId,
-'userId': userId,
-'amount': amount,
-'paymentId': paymentId,
-'paymentMethod': paymentMethod,
-'purpose': purpose,
-}),
-));
-return jsonDecode(res.body);
-} catch (e) {
-debugPrint('ApiService verifyPaymentSuccess error: $e');
-return _errorResponse(e);
-}
+  try {
+    final res = await _request((url) => http.post(
+      Uri.parse('$url/payments?action=verify-success'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'action': 'verify-success',
+        'orderId': orderId,
+        'userId': userId,
+        'amount': amount,
+        'paymentId': paymentId,
+        'paymentMethod': paymentMethod,
+        'purpose': purpose,
+        'planId': planId,
+        'planName': planName,
+        'type': type ?? (planId != null ? 'subscription' : 'consultation'),
+      }),
+    ), endpoint: '/payments?action=verify-success');
+    return jsonDecode(res.body);
+  } catch (e) {
+    debugPrint('ApiService verifyPaymentSuccess error: $e');
+    return _errorResponse(e);
+  }
 }
 
 // =========================================================================

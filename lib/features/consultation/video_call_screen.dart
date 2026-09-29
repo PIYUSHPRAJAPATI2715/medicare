@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../data/mock/mock_data.dart';
 import '../../models/doctor_model.dart';
 import '../../services/agora_service.dart';
+import '../../providers/subscription_provider.dart';
 import 'consultation_summary_screen.dart';
 
 class VideoCallScreen extends ConsumerStatefulWidget {
@@ -53,6 +54,9 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
   void _handleEndCall(DoctorModel doc) async {
     final duration = _agora.callDurationSeconds;
     await _agora.leaveChannel();
+
+    // Deduct 1 consultation credit from active care plan
+    ref.read(subscriptionProvider.notifier).useConsultation();
 
     if (!mounted) return;
 

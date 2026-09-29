@@ -1,4 +1,4 @@
-import { initialWallets } from './data.js';
+import { getWallet, topupWallet, payWithWallet } from './store.js';
 
 export default function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -7,127 +7,85 @@ export default function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  const userId = req.query.userId || req.query.id || req.body?.userId || 'u1';
+  const { userId, amount, paymentMethod, referenceId, purpose, category } = req.body || req.query || {};
+  const action = req.query.action || req.body?.action;
+  const pathPart = (req.url || '').split('?')[0];
 
-  // Ensure user wallet exists
-  if (!initialWallets[userId]) {
-    initialWallets[userId] = {
-      userId,
-      balance: 1450.0,
-      totalCashbackEarned: 185.0,
-      transactions: [
-        {
-          id: `tx_${Date.now()}`,
-          title: 'Welcome HealthPay Bonus',
-          description: 'Promotional credit added',
-          amount: 500.0,
-          isCredit: true,
-          category: 'welcome',
-          timestamp: new Date().toISOString(),
-          referenceId: 'WELCOME-HEALTH',
-          status: 'completed',
-        },
-      ],
-    };
-  }
+  const targetUserId = userId || req.query.id || 'u1';
 
-  const wallet = initialWallets[userId];
-
-  // POST: topup, pay, or transfer
-  if (req.method === 'POST') {
-    const { action, amount, paymentMethod, description, recipientPhone } = req.body || {};
-    const parsedAmount = Math.abs(Number(amount)) || 0;
-
-    if (action === 'pay') {
-      if (wallet.balance < parsedAmount) {
-        return res.status(400).json({
-          status: 400,
-          success: false,
-          message: 'Insufficient HealthPay balance for this transaction.',
-          data: wallet,
-        });
-      }
-      wallet.balance -= parsedAmount;
-      const tx = {
-        id: `tx_${Date.now()}`,
-        title: 'Payment Completed',
-        description: description || 'Health consultation fee',
-        amount: parsedAmount,
-        isCredit: false,
-        category: 'payment',
-        timestamp: new Date().toISOString(),
-        referenceId: `PAY-${Date.now()}`,
-        status: 'completed',
-      };
-      wallet.transactions.unshift(tx);
-
-      return res.status(200).json({
-        status: 200,
-        success: true,
-        message: 'Payment completed successfully with HealthPay',
-        data: wallet,
-      });
-    }
-
-    if (action === 'transfer') {
-      if (wallet.balance < parsedAmount) {
-        return res.status(400).json({
-          status: 400,
-          success: false,
-          message: 'Insufficient HealthPay balance for transfer.',
-          data: wallet,
-        });
-      }
-      wallet.balance -= parsedAmount;
-      const tx = {
-        id: `tx_${Date.now()}`,
-        title: `Transferred to ${recipientPhone || 'User'}`,
-        description: 'P2P HealthPay Transfer',
-        amount: parsedAmount,
-        isCredit: false,
-        category: 'transfer',
-        timestamp: new Date().toISOString(),
-        referenceId: `TRF-${Date.now()}`,
-        status: 'completed',
-      };
-      wallet.transactions.unshift(tx);
-
-      return res.status(200).json({
-        status: 200,
-        success: true,
-        message: `₹${parsedAmount} transferred successfully`,
-        data: wallet,
-      });
-    }
-
-    // Default action: Top-up
-    wallet.balance += parsedAmount;
-    const tx = {
-      id: `tx_${Date.now()}`,
-      title: 'HealthPay Balance Added',
-      description: `Top-up via ${paymentMethod || 'UPI'}`,
-      amount: parsedAmount,
-      isCredit: true,
-      category: 'topUp',
-      timestamp: new Date().toISOString(),
-      referenceId: `UPI-${Date.now()}`,
-      status: 'completed',
-    };
-    wallet.transactions.unshift(tx);
-
+  // 1. GET Wallet details
+  if (req.method === 'GET' && !action) {
+    const wallet = getWallet(targetUserId);
     return res.status(200).json({
       status: 200,
+      statusCode: 200,
       success: true,
-      message: `₹${parsedAmount} added to HealthPay wallet successfully`,
+      message: 'Wallet balance and transaction history retrieved',
       data: wallet,
     });
   }
 
-  // GET: return wallet details
-  return res.status(200).json({
-    status: 200,
-    success: true,
-    message: 'HealthPay wallet details retrieved',
-    data: wallet,
+  // 2. POST /topup
+  if (action === 'topup' || pathPart.endsWith('/topup')) {
+    const numAmount = Number(amount);
+    if (!numAmount || numAmount <= 0) {
+      return res.status(400).json({
+        status: 400,
+        statusCode: 400,
+        success: false,
+        message: 'Valid top-up amount is required',
+        data: null,
+      });
+    }
+
+    const updatedWallet = topupWallet(targetUserId, numAmount, paymentMethod || 'UPI', referenceId);
+    return res.status(200).json({
+      status: 200,
+      statusCode: 200,
+      success: true,
+      message: `₹${numAmount} credited to MediCare+ HealthPay Wallet`,
+      data: updatedWallet,
+    });
+  }
+
+  // 3. POST /pay
+  if (action === 'pay' || pathPart.endsWith('/pay') || (req.method === 'POST' && purpose)) {
+    const numAmount = Number(amount);
+    if (!numAmount || numAmount <= 0) {
+      return res.status(400).json({
+        status: 400,
+        statusCode: 400,
+        success: false,
+        message: 'Valid payment amount is required',
+        data: null,
+      });
+    }
+
+    const result = payWithWallet(targetUserId, numAmount, purpose || 'Doctor Consultation', category || 'consultation', referenceId);
+    if (!result.success) {
+      return res.status(400).json({
+        status: 400,
+        statusCode: 400,
+        success: false,
+        message: result.message || 'Insufficient wallet balance',
+        data: null,
+      });
+    }
+
+    return res.status(200).json({
+      status: 200,
+      statusCode: 200,
+      success: true,
+      message: 'Payment completed successfully via HealthPay',
+      data: result.data,
+    });
+  }
+
+  return res.status(405).json({
+    status: 405,
+    statusCode: 405,
+    success: false,
+    message: 'Method not allowed',
+    data: null,
   });
 }

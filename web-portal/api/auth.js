@@ -1,4 +1,4 @@
-import { initialUsers, initialDoctors } from './data.js';
+import { addUser, getUsers, addDoctor, getDoctors, deleteUser, getUserSubscription } from './store.js';
 
 export default function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -9,289 +9,212 @@ export default function handler(req, res) {
     return res.status(204).end();
   }
 
-  // Determine action from query, url, or body
-  const action = req.query.action || req.body?.action || (req.url.includes('login') ? 'login' : req.url.includes('doctor-status') ? 'doctor-status' : req.url.includes('doctor-register') ? 'doctor-register' : req.url.includes('register-patient') ? 'register-patient' : 'login');
+  const { action, id } = req.query;
+  const pathPart = (req.url || '').split('?')[0].replace('/api/auth/', '').replace('/api/auth', '');
+  const resolvedAction = action || pathPart || req.body?.action || 'login';
 
-  // 1. DOCTOR STATUS
-  if (action === 'doctor-status' || req.method === 'GET') {
-    const id = req.query.id || req.query.doctorId;
-    if (!id) {
-      return res.status(400).json({
-        status: 400,
-        success: false,
-        message: 'Doctor ID is required',
-        data: null,
-      });
-    }
-    const doc = initialDoctors.find(d => d.id === id);
-    if (!doc) {
-      return res.status(404).json({
-        status: 404,
-        success: false,
-        message: 'Doctor not found',
-        data: null,
-      });
-    }
-    const status = doc.verificationStatus || (doc.isVerified ? 'approved' : 'pending');
-    return res.status(200).json({
-      status: 200,
-      success: true,
-      message: 'Doctor verification status fetched successfully',
-      data: {
-        doctorId: doc.id,
-        name: doc.name,
-        status: status,
-        isVerified: status === 'approved',
-        rejectionReason: doc.rejectionReason || null,
-        submittedAt: doc.createdAt || null,
-      },
-    });
-  }
-
-  // 2. REGISTER PATIENT / SIGNUP
-  if (action === 'register-patient' || action === 'signup') {
+  // 1. Patient Registration / Signup
+  if (resolvedAction === 'register-patient' || resolvedAction === 'signup' || req.method === 'POST' && resolvedAction.includes('register-patient')) {
     const { name, email, phone, password, gender, dob, currentCity } = req.body || {};
-    if (!name || !phone) {
+
+    if (!name || (!email && !phone)) {
       return res.status(400).json({
         status: 400,
+        statusCode: 400,
         success: false,
-        message: 'Full Name and Phone Number are required fields',
+        message: 'Name and email or phone number are required for registration.',
         data: null,
       });
     }
 
-    const existing = initialUsers.find(
-      u => (phone && u.phone && u.phone.replace(/[\s-]/g, '') === String(phone).replace(/[\s-]/g, ''))
-    );
-    if (existing) {
-      return res.status(409).json({
-        status: 409,
-        success: false,
-        message: 'An account with this phone number already exists. Please login.',
-        data: null,
-      });
-    }
-
-    const newUser = {
+    const newUser = addUser({
       id: `u_${Date.now()}`,
-      name,
-      email: email || '',
-      phone,
+      name: name.trim(),
+      email: email ? email.trim() : `user_${Date.now()}@drconnects24.com`,
+      phone: phone ? phone.trim() : '+91 98765 00000',
       role: 'patient',
       status: 'active',
-      gender: gender || 'Male',
-      dob: dob || '1995-08-15',
+      gender: gender || 'Not specified',
+      dob: dob || '1995-01-01',
       currentCity: currentCity || 'Jaipur',
       createdAt: new Date().toISOString(),
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
-    };
-    initialUsers.unshift(newUser);
+      avatarUrl: req.body?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+      hasActiveCarePlan: false,
+      consultationsRemaining: 0,
+    });
 
     return res.status(201).json({
       status: 201,
+      statusCode: 201,
       success: true,
-      message: 'Patient account created successfully',
+      message: 'Patient account registered successfully on live drconnects24 network',
       data: {
-        token: `jwt_${newUser.id}_${Date.now()}`,
+        token: `jwt_live_${newUser.id}`,
         user: newUser,
       },
     });
   }
 
-  // 3. DOCTOR REGISTER
-  if (action === 'doctor-register') {
-    const data = req.body || {};
-    if (!data.name || !data.medicalLicenseNo || !data.specialty) {
-      return res.status(400).json({
-        status: 400,
-        success: false,
-        message: 'Doctor name, medical license number, and specialty are required.',
-        data: null,
-      });
-    }
+  // 2. Doctor Registration
+  if (resolvedAction === 'doctor-register') {
+    const {
+      name,
+      email,
+      phone,
+      specialty,
+      qualification,
+      experienceYears,
+      consultationFee,
+      clinicName,
+      clinicAddress,
+      medicalLicenseNo,
+      stateMedicalCouncil,
+      qualificationCertUrl,
+      idProofUrl,
+      clinicAddressProofUrl,
+    } = req.body || {};
 
-    const newDoc = {
-      id: `d_${Date.now()}`,
-      name: data.name,
-      specialty: data.specialty,
-      subSpecialty: data.subSpecialty || '',
-      qualification: data.qualification || 'MBBS',
-      experienceYears: Number(data.experienceYears) || 5,
-      experienceText: `${data.experienceYears || 5} yrs exp`,
-      ratingPercentage: 100,
-      patientStoriesCount: 0,
-      consultationFee: Number(data.consultationFee) || 500,
-      imageUrl: data.imageUrl || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400',
-      isOnline: false,
-      allowsPhysical: true,
-      allowsVideo: true,
+    const docId = `d_${Date.now()}`;
+    const newDoctor = addDoctor({
+      id: docId,
+      name: name || 'Dr. Specialist',
+      email: email || `dr.${docId}@drconnects24.com`,
+      phone: phone || '+91 90000 00000',
+      specialty: specialty || 'General Physician',
+      qualification: qualification || 'MBBS',
+      experienceYears: Number(experienceYears) || 3,
+      consultationFee: Number(consultationFee) || 500,
+      clinicName: clinicName || 'Health Clinic',
+      clinicAddress: clinicAddress || 'Jaipur',
+      medicalLicenseNo: medicalLicenseNo || 'MCI/2026/PENDING',
+      stateMedicalCouncil: stateMedicalCouncil || 'Medical Council of India',
+      qualificationCertUrl: qualificationCertUrl || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600',
+      idProofUrl: idProofUrl || 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600',
+      clinicAddressProofUrl: clinicAddressProofUrl || 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=600',
       isVerified: false,
       verificationStatus: 'pending',
-      phone: data.phone || '',
-      email: data.email || '',
-      medicalLicenseNo: data.medicalLicenseNo,
-      stateMedicalCouncil: data.stateMedicalCouncil || '',
-      registrationYear: data.registrationYear || '2020',
-      clinicName: data.clinicName || '',
-      clinicAddress: data.clinicAddress || '',
-      city: data.city || 'Jaipur',
-      pincode: data.pincode || '',
-      medicalCouncilCertUrl: data.medicalCouncilCertUrl || '',
-      primaryDegreeCertUrl: data.primaryDegreeCertUrl || '',
-      postGradCertUrl: data.postGradCertUrl || '',
-      idProofUrl: data.idProofUrl || '',
-      clinicAddressProofUrl: data.clinicAddressProofUrl || '',
-      doctorSignatureUrl: data.doctorSignatureUrl || '',
-      bankName: data.bankName || '',
-      accountHolder: data.accountHolder || '',
-      accountNo: data.accountNo || '',
-      ifscCode: data.ifscCode || '',
-      upiId: data.upiId || '',
-      panNumber: data.panNumber || '',
-      languages: Array.isArray(data.languages) ? data.languages : ['English', 'Hindi'],
-      aboutText: data.aboutText || '',
-      services: Array.isArray(data.services) ? data.services : ['General Consultation'],
-      createdAt: new Date().toISOString(),
-    };
-    initialDoctors.unshift(newDoc);
+    });
+
+    const newUser = addUser({
+      id: `u_${Date.now()}`,
+      name: name || 'Dr. Specialist',
+      email: email || `dr.${docId}@drconnects24.com`,
+      phone: phone || '+91 90000 00000',
+      role: 'doctor',
+      status: 'pending_verification',
+      doctorId: docId,
+      avatarUrl: newDoctor.imageUrl,
+    });
 
     return res.status(201).json({
       status: 201,
+      statusCode: 201,
       success: true,
-      message: 'Doctor registration submitted successfully! Profile is under verification.',
+      message: 'Doctor application submitted successfully! Under review by drconnects24 admin.',
       data: {
-        status: 'pending',
-        isVerified: false,
-        doctor: newDoc,
+        doctor: newDoctor,
+        user: newUser,
       },
     });
   }
 
-  // 4. DELETE ACCOUNT
-  if (action === 'delete-account' || req.method === 'DELETE') {
-    const id = req.query.id || req.body?.userId || req.body?.id;
-    if (!id) {
+  // 3. Doctor Verification Status Check
+  if (resolvedAction === 'doctor-status' || resolvedAction.startsWith('doctor-status')) {
+    const doctorId = id || req.query.doctorId || req.body?.doctorId;
+    const doctors = getDoctors({ all: 'true' });
+    const doctor = doctors.find(d => d.id === doctorId);
+
+    if (!doctor) {
+      return res.status(404).json({
+        status: 404,
+        statusCode: 404,
+        success: false,
+        message: 'Doctor record not found',
+        data: null,
+      });
+    }
+
+    return res.status(200).json({
+      status: 200,
+      statusCode: 200,
+      success: true,
+      message: 'Doctor status retrieved',
+      data: {
+        id: doctor.id,
+        isVerified: doctor.isVerified,
+        verificationStatus: doctor.verificationStatus || (doctor.isVerified ? 'approved' : 'pending'),
+        rejectionNotes: doctor.rejectionNotes || null,
+      },
+    });
+  }
+
+  // 4. Delete Account
+  if (resolvedAction === 'delete-account' || req.method === 'DELETE') {
+    const userId = id || req.query.userId || req.body?.userId;
+    if (!userId) {
       return res.status(400).json({
         status: 400,
+        statusCode: 400,
         success: false,
         message: 'User ID is required to delete account',
         data: null,
       });
     }
-    const uIdx = initialUsers.findIndex(u => u.id === id);
-    if (uIdx !== -1) initialUsers.splice(uIdx, 1);
-    const dIdx = initialDoctors.findIndex(d => d.id === id);
-    if (dIdx !== -1) initialDoctors.splice(dIdx, 1);
 
+    deleteUser(userId);
     return res.status(200).json({
       status: 200,
+      statusCode: 200,
       success: true,
-      message: 'Account deleted permanently from MediCare+ system',
-      data: { id, deleted: true },
+      message: 'User account and profile deleted successfully',
+      data: { id: userId, deleted: true },
     });
   }
 
-  // 5. UNIFIED LOGIN (default)
-  const { emailOrPhone, password, role } = req.body || {};
-
-  if (!emailOrPhone || !password) {
+  // 5. Login
+  const { emailOrPhone, password, role } = req.body || req.query || {};
+  if (!emailOrPhone) {
     return res.status(400).json({
       status: 400,
+      statusCode: 400,
       success: false,
-      message: 'Email/Phone and password are required',
+      message: 'Email or phone is required',
       data: null,
     });
   }
 
-  const cleanInput = String(emailOrPhone).trim().toLowerCase();
-  const targetRole = role ? String(role).toLowerCase() : 'patient';
+  const clean = String(emailOrPhone).trim().toLowerCase().replace(/[\s-]/g, '');
+  const users = getUsers();
+  const user = users.find(u => {
+    const uPhone = (u.phone || '').replace(/[\s-]/g, '').toLowerCase();
+    const uEmail = (u.email || '').toLowerCase();
+    return uPhone === clean || uEmail === clean;
+  });
 
-  // Doctor login
-  if (targetRole === 'doctor') {
-    const doctor = initialDoctors.find(
-      d => (d.email && d.email.toLowerCase() === cleanInput) ||
-           (d.phone && d.phone.replace(/[\s-]/g, '') === cleanInput.replace(/[\s-]/g, '')) ||
-           d.name.toLowerCase().includes(cleanInput)
-    );
-
-    if (!doctor) {
-      return res.status(404).json({
-        status: 404,
-        success: false,
-        message: 'Doctor account not found with given credentials.',
-        data: null,
-      });
-    }
-
-    if (doctor.verificationStatus === 'pending' || !doctor.isVerified) {
-      return res.status(403).json({
-        status: 403,
-        success: false,
-        message: 'Your doctor profile is under verification. Credential review in progress.',
-        data: {
-          status: 'pending',
-          isVerified: false,
-          doctor,
-        },
-      });
-    }
-
+  if (user) {
+    const activeSub = getUserSubscription(user.id);
     return res.status(200).json({
       status: 200,
+      statusCode: 200,
       success: true,
-      message: 'Doctor login successful',
+      message: 'Authentication successful',
       data: {
-        token: `jwt_doc_${doctor.id}_${Date.now()}`,
+        token: `jwt_live_${user.id}`,
+        role: user.role || 'patient',
         user: {
-          id: doctor.id,
-          name: doctor.name,
-          email: doctor.email || `${doctor.id}@medicare.com`,
-          phone: doctor.phone || '+91 98290 11223',
-          role: 'doctor',
-          avatarUrl: doctor.imageUrl,
-          specialty: doctor.specialty,
-          isVerified: doctor.isVerified,
-          verificationStatus: doctor.verificationStatus,
+          ...user,
+          hasActiveCarePlan: !!activeSub,
+          activePlanName: activeSub ? activeSub.planName : user.activePlanName,
         },
       },
     });
   }
 
-  // Patient / Admin login
-  let user = initialUsers.find(
-    u => (u.email && u.email.toLowerCase() === cleanInput) ||
-         (u.phone && u.phone.replace(/[\s-]/g, '') === cleanInput.replace(/[\s-]/g, ''))
-  );
-
-  if (!user && targetRole === 'patient') {
-    user = initialUsers.find(u => u.role === 'patient');
-  }
-
-  if (!user) {
-    return res.status(404).json({
-      status: 404,
-      success: false,
-      message: 'Account not found. Please register first.',
-      data: null,
-    });
-  }
-
-  return res.status(200).json({
-    status: 200,
-    success: true,
-    message: 'Login successful',
-    data: {
-      token: `jwt_${user.id}_${Date.now()}`,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role || targetRole,
-        status: user.status || 'active',
-        avatarUrl: user.avatarUrl,
-        currentCity: user.currentCity || 'Jaipur',
-      },
-    },
+  return res.status(401).json({
+    status: 401,
+    statusCode: 401,
+    success: false,
+    message: 'User not found. Please register.',
+    data: null,
   });
 }
