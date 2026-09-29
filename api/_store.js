@@ -248,26 +248,31 @@ function getSeedStore() {
   };
 }
 
-export function getStore() {
-  if (cachedStore) {
-    return cachedStore;
-  }
+let lastMtime = 0;
 
+export function getStore() {
   try {
     if (fs.existsSync(DB_FILE_PATH)) {
-      const raw = fs.readFileSync(DB_FILE_PATH, 'utf-8');
-      cachedStore = JSON.parse(raw);
-      // Validate schema keys
-      if (!cachedStore.payments) cachedStore.payments = [...initialPayments];
-      if (!cachedStore.subscriptions) cachedStore.subscriptions = [...initialSubscriptions];
-      if (!cachedStore.wallets) cachedStore.wallets = { ...initialWallets };
-      if (!cachedStore.users) cachedStore.users = [...initialUsers];
-      if (!cachedStore.doctors) cachedStore.doctors = [...initialDoctors];
-      return cachedStore;
+      const stat = fs.statSync(DB_FILE_PATH);
+      if (!cachedStore || stat.mtimeMs > lastMtime) {
+        const raw = fs.readFileSync(DB_FILE_PATH, 'utf-8');
+        cachedStore = JSON.parse(raw);
+        lastMtime = stat.mtimeMs;
+      }
+      if (cachedStore) {
+        if (!cachedStore.payments) cachedStore.payments = [...initialPayments];
+        if (!cachedStore.subscriptions) cachedStore.subscriptions = [...initialSubscriptions];
+        if (!cachedStore.wallets) cachedStore.wallets = { ...initialWallets };
+        if (!cachedStore.users) cachedStore.users = [...initialUsers];
+        if (!cachedStore.doctors) cachedStore.doctors = [...initialDoctors];
+        return cachedStore;
+      }
     }
   } catch (err) {
     console.warn('[Store] Could not read /tmp db file, falling back to seed:', err.message);
   }
+
+  if (cachedStore) return cachedStore;
 
   cachedStore = getSeedStore();
   saveStore(cachedStore);
@@ -278,6 +283,7 @@ export function saveStore(store) {
   cachedStore = store;
   try {
     fs.writeFileSync(DB_FILE_PATH, JSON.stringify(store, null, 2), 'utf-8');
+    lastMtime = fs.statSync(DB_FILE_PATH).mtimeMs;
   } catch (err) {
     console.warn('[Store] Could not persist to /tmp db file:', err.message);
   }
