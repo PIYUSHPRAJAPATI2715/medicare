@@ -145,15 +145,14 @@ class _SubscriptionPaywallDialogState
     _razorpayService.openCheckout(
       amount: selectedPlan.price,
       name: selectedPlan.name,
-      description: 'Care Plan Subscription - ${selectedPlan.name}',
+      description: 'Care Plan: ${selectedPlan.name}',
       userEmail: currentUser.email,
       userPhone: currentUser.phone,
       userName: currentUser.name,
-      notes: {
-        'planId': selectedPlan.id,
-        'planName': selectedPlan.name,
-        'userId': currentUser.id,
-      },
+      userId: currentUser.id,
+      planId: selectedPlan.id,
+      planName: selectedPlan.name,
+      purpose: 'Subscription: ${selectedPlan.name}',
     );
   }
 

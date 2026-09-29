@@ -516,27 +516,90 @@ export default async function handler(req, res) {
 
     if (action === 'create-order' || (method === 'POST' && body.amount && !body.paymentId)) {
       const numAmount = Number(body.amount || query.amount) || 499;
-      const orderId = `order_${Date.now()}_${Math.floor(100 + Math.random() * 900)}`;
+      const amountInPaise = Math.round(numAmount * 100);
       const user = body.userId ? getUserById(body.userId) : null;
 
-      return sendJson(res, 200, {
-        status: 200,
-        statusCode: 200,
-        success: true,
-        message: 'Razorpay payment order initialized',
-        data: {
-          orderId,
-          amount: numAmount,
-          amountInPaise: Math.round(numAmount * 100),
+      // ── Create a REAL Razorpay order via Razorpay Orders API ────────────
+      try {
+        const { default: https } = await import('https');
+        const auth = Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64');
+        const orderPayload = JSON.stringify({
+          amount: amountInPaise,
           currency: 'INR',
-          keyId: RAZORPAY_KEY_ID,
-          purpose: body.purpose || 'Doctor Consultation',
-          userId: body.userId || (user ? user.id : 'u1'),
-          userName: user ? user.name : 'Patient',
-          planId: body.planId || null,
-          planName: body.planName || null,
-        },
-      });
+          receipt: `rcpt_${Date.now()}`,
+          notes: {
+            userId: body.userId || '',
+            purpose: body.purpose || 'MediCare+ Payment',
+            planId: body.planId || '',
+          },
+        });
+
+        const rzpOrder = await new Promise((resolve, reject) => {
+          const req = https.request(
+            {
+              hostname: 'api.razorpay.com',
+              path: '/v1/orders',
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Basic ${auth}`,
+                'Content-Length': Buffer.byteLength(orderPayload),
+              },
+            },
+            (r) => {
+              let raw = '';
+              r.on('data', (c) => { raw += c; });
+              r.on('end', () => {
+                try { resolve(JSON.parse(raw)); } catch { reject(new Error('Invalid JSON from Razorpay')); }
+              });
+            }
+          );
+          req.on('error', reject);
+          req.write(orderPayload);
+          req.end();
+        });
+
+        if (rzpOrder.id) {
+          return sendJson(res, 200, {
+            status: 200, statusCode: 200, success: true,
+            message: 'Razorpay order created',
+            data: {
+              orderId: rzpOrder.id,
+              amount: numAmount,
+              amountInPaise,
+              currency: 'INR',
+              keyId: RAZORPAY_KEY_ID,
+              purpose: body.purpose || 'MediCare+ Payment',
+              userId: body.userId || (user ? user.id : ''),
+              userName: user ? user.name : 'Patient',
+              planId: body.planId || null,
+              planName: body.planName || null,
+            },
+          });
+        }
+        // fall through to mock on failure
+        throw new Error(rzpOrder.error?.description || 'Razorpay order creation failed');
+      } catch (err) {
+        // fallback: return a local order ID so the app can still open checkout
+        console.warn('[create-order] Razorpay API call failed, using local fallback:', err.message);
+        const fallbackOrderId = `order_local_${Date.now()}`;
+        return sendJson(res, 200, {
+          status: 200, statusCode: 200, success: true,
+          message: 'Razorpay order initialized (local fallback)',
+          data: {
+            orderId: fallbackOrderId,
+            amount: numAmount,
+            amountInPaise,
+            currency: 'INR',
+            keyId: RAZORPAY_KEY_ID,
+            purpose: body.purpose || 'MediCare+ Payment',
+            userId: body.userId || (user ? user.id : ''),
+            userName: user ? user.name : 'Patient',
+            planId: body.planId || null,
+            planName: body.planName || null,
+          },
+        });
+      }
     }
 
     if (action === 'verify-success' || (method === 'POST' && (body.paymentId || body.razorpay_payment_id))) {

@@ -111,14 +111,13 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     _razorpayService.openCheckout(
       amount: amount,
       name: 'HealthPay Wallet Top-Up',
-      description: 'Add ₹${amount.toStringAsFixed(0)} to MediCare HealthPay Wallet',
+      description: 'Add ₹${amount.toStringAsFixed(0)} to MediCare Wallet',
       userEmail: currentUser.email,
       userPhone: currentUser.phone,
       userName: currentUser.name,
-      notes: {
-        'userId': currentUser.id,
-        'type': 'wallet_topup',
-      },
+      userId: currentUser.id,
+      purpose: 'Wallet Top-Up',
+      notes: {'type': 'wallet_topup'},
     );
   }
 

@@ -116,15 +116,14 @@ class _CarePlanScreenState extends ConsumerState<CarePlanScreen> {
     _razorpayService.openCheckout(
       amount: plan.price,
       name: plan.name,
-      description: 'Care Plan Subscription - ${plan.name}',
+      description: 'Care Plan: ${plan.name}',
       userEmail: currentUser.email,
       userPhone: currentUser.phone,
       userName: currentUser.name,
-      notes: {
-        'planId': plan.id,
-        'planName': plan.name,
-        'userId': currentUser.id,
-      },
+      userId: currentUser.id,
+      planId: plan.id,
+      planName: plan.name,
+      purpose: 'Care Plan Subscription - ${plan.name}',
     );
   }
 
