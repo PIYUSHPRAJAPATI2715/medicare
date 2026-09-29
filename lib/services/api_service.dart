@@ -18,6 +18,37 @@ class ApiService {
 /// Every API request in this service must use this URL.
 static const String baseUrl = 'https://www.drconnects24.com/api';
 
+/// Active JWT session token persisted from SharedPreferences
+static String? _authToken;
+
+/// Store or clear active auth token
+static void setAuthToken(String? token) {
+  _authToken = token;
+  if (token != null && token.isNotEmpty) {
+    debugPrint('🔐 [ApiService] Bearer Token set: ${token.substring(0, token.length > 20 ? 20 : token.length)}...');
+  } else {
+    debugPrint('🔓 [ApiService] Bearer Token cleared');
+  }
+}
+
+/// Active session token getter
+static String? get authToken => _authToken;
+
+/// Standard headers for all API requests ensuring Bearer token security
+static Map<String, String> defaultHeaders([Map<String, String>? extra]) {
+  final headers = <String, String>{
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+  if (_authToken != null && _authToken!.trim().isNotEmpty) {
+    headers['Authorization'] = 'Bearer ${_authToken!.trim()}';
+  }
+  if (extra != null) {
+    headers.addAll(extra);
+  }
+  return headers;
+}
+
 /// Sends a request only to the production API.
 static Future<http.Response> _request(
   Future<http.Response> Function(String url) requestFn, {
@@ -141,7 +172,7 @@ static Future<Map<String, dynamic>> login({
     final res = await _request(
       (url) => http.post(
         Uri.parse('$url/auth/login'),
-        headers: {'Content-Type': 'application/json'},
+        headers: defaultHeaders(),
         body: jsonEncode({
           'emailOrPhone': emailOrPhone,
           'password': password,
@@ -154,6 +185,10 @@ static Future<Map<String, dynamic>> login({
     if (res.statusCode < 400) {
       final decoded = _decodeObject(res);
       if (decoded['success'] == true && decoded['data'] != null) {
+        final token = decoded['data']['token']?.toString() ?? decoded['data']['authToken']?.toString();
+        if (token != null && token.isNotEmpty) {
+          setAuthToken(token);
+        }
         return decoded;
       }
     }
@@ -164,7 +199,7 @@ static Future<Map<String, dynamic>> login({
         final resLogin = await _request(
           (url) => http.post(
             Uri.parse('$url/login'),
-            headers: {'Content-Type': 'application/json'},
+            headers: defaultHeaders(),
             body: jsonEncode({
               'emailOrPhone': emailOrPhone,
               'password': password,
@@ -176,6 +211,10 @@ static Future<Map<String, dynamic>> login({
         if (resLogin.statusCode < 400) {
           final decoded = _decodeObject(resLogin);
           if (decoded['success'] == true && decoded['data'] != null) {
+            final token = decoded['data']['token']?.toString() ?? decoded['data']['authToken']?.toString();
+            if (token != null && token.isNotEmpty) {
+              setAuthToken(token);
+            }
             return decoded;
           }
         }
@@ -319,12 +358,13 @@ static Future<Map<String, dynamic>> registerPatient({
   String gender = 'Male',
   String dob = '1995-08-15',
   String currentCity = 'Jaipur',
+  String? avatarUrl,
 }) async {
   try {
     final res = await _request(
       (url) => http.post(
         Uri.parse('$url/auth/register-patient'),
-        headers: {'Content-Type': 'application/json'},
+        headers: defaultHeaders(),
         body: jsonEncode({
           'name': name,
           'email': email,
@@ -333,12 +373,20 @@ static Future<Map<String, dynamic>> registerPatient({
           'gender': gender,
           'dob': dob,
           'currentCity': currentCity,
+          if (avatarUrl != null && avatarUrl.isNotEmpty) 'avatarUrl': avatarUrl,
         }),
       ),
       endpoint: '/auth/register-patient',
     );
     if (res.statusCode < 400) {
-      return _decodeObject(res);
+      final decoded = _decodeObject(res);
+      if (decoded['success'] == true && decoded['data'] != null) {
+        final token = decoded['data']['token']?.toString() ?? decoded['data']['authToken']?.toString();
+        if (token != null && token.isNotEmpty) {
+          setAuthToken(token);
+        }
+      }
+      return decoded;
     }
   } catch (_) {}
 
@@ -355,26 +403,28 @@ static Future<Map<String, dynamic>> registerPatient({
       'dob': dob,
       'currentCity': currentCity,
       'createdAt': DateTime.now().toIso8601String(),
-      'avatarUrl': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+      'avatarUrl': avatarUrl ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
     };
 
     final resUser = await _request(
       (url) => http.post(
         Uri.parse('$url/users'),
-        headers: {'Content-Type': 'application/json'},
+        headers: defaultHeaders(),
         body: jsonEncode(userPayload),
       ),
       endpoint: '/users',
     );
 
     if (resUser.statusCode < 400) {
+      final token = 'jwt_live_${userPayload['id']}';
+      setAuthToken(token);
       final success = {
         'status': 201,
         'statusCode': 201,
         'success': true,
         'message': 'Patient account registered successfully on live drconnects24 network',
         'data': {
-          'token': 'jwt_live_${userPayload['id']}',
+          'token': token,
           'user': userPayload,
         },
       };
@@ -436,7 +486,7 @@ static Future<Map<String, dynamic>> registerDoctor({
     final res = await _request(
       (url) => http.post(
         Uri.parse('$url/auth/doctor-register'),
-        headers: {'Content-Type': 'application/json'},
+        headers: defaultHeaders(),
         body: jsonEncode({
           'name': name,
           'email': email,
@@ -510,7 +560,7 @@ static Future<Map<String, dynamic>> registerDoctor({
     final resDoc = await _request(
       (url) => http.post(
         Uri.parse('$url/doctors'),
-        headers: {'Content-Type': 'application/json'},
+        headers: defaultHeaders(),
         body: jsonEncode(docPayload),
       ),
       endpoint: '/doctors',
@@ -610,12 +660,12 @@ static Future<UserModel?> getUserProfile(String userId) async {
   return null;
 }
 
-/// Update User Profile
+/// Update User Profile with Bearer token authentication
 static Future<bool> updateUserProfile(String userId, Map<String, dynamic> data) async {
   try {
     final res = await _request((url) => http.put(
       Uri.parse('$url/users?id=$userId'),
-      headers: {'Content-Type': 'application/json'},
+      headers: defaultHeaders(),
       body: jsonEncode(data),
     ), endpoint: '/users?id=$userId');
     if (res.statusCode == 200) {
@@ -626,6 +676,11 @@ static Future<bool> updateUserProfile(String userId, Map<String, dynamic> data) 
     debugPrint('ApiService.updateUserProfile error: $e');
   }
   return false;
+}
+
+/// Upload or update patient profile photo to live backend & admin
+static Future<bool> uploadProfilePhoto(String userId, String base64DataUriOrUrl) async {
+  return await updateUserProfile(userId, {'avatarUrl': base64DataUriOrUrl});
 }
 
 /// Delete Account Permanently
@@ -774,7 +829,7 @@ static Future<Map<String, dynamic>> purchaseSubscription({
   try {
     final res = await _request((url) => http.post(
       Uri.parse('$url/subscriptions'),
-      headers: {'Content-Type': 'application/json'},
+      headers: defaultHeaders(),
       body: jsonEncode({
         'action': 'purchase',
         'userId': userId,
@@ -794,7 +849,7 @@ static Future<Map<String, dynamic>> purchaseSubscription({
 static Future<Map<String, dynamic>?> getUserSubscription(String userId) async {
   try {
     final res = await _request(
-      (url) => http.get(Uri.parse('$url/subscriptions?userId=$userId')),
+      (url) => http.get(Uri.parse('$url/subscriptions?userId=$userId'), headers: defaultHeaders()),
       endpoint: '/subscriptions?userId=$userId',
     );
     if (res.statusCode == 200) {
@@ -812,7 +867,7 @@ static Future<bool> cancelSubscription(String userId, String subscriptionId) asy
   try {
     final res = await _request((url) => http.post(
       Uri.parse('$url/subscriptions'),
-      headers: {'Content-Type': 'application/json'},
+      headers: defaultHeaders(),
       body: jsonEncode({'action': 'cancel', 'userId': userId, 'subscriptionId': subscriptionId}),
     ), endpoint: '/subscriptions');
     return res.statusCode == 200;
@@ -883,7 +938,7 @@ static Future<WalletAccount?> topupWallet({
   try {
     final res = await _request((url) => http.post(
       Uri.parse('$url/wallet'),
-      headers: {'Content-Type': 'application/json'},
+      headers: defaultHeaders(),
       body: jsonEncode({
         'action': 'topup',
         'userId': userId,
@@ -914,7 +969,7 @@ static Future<Map<String, dynamic>> payWithWallet({
   try {
     final res = await _request((url) => http.post(
       Uri.parse('$url/wallet'),
-      headers: {'Content-Type': 'application/json'},
+      headers: defaultHeaders(),
       body: jsonEncode({
         'action': 'pay',
         'userId': userId,
@@ -945,7 +1000,7 @@ static Future<Map<String, dynamic>> createPaymentOrder({
   try {
     final res = await _request((url) => http.post(
       Uri.parse('$url/payments?action=create-order'),
-      headers: {'Content-Type': 'application/json'},
+      headers: defaultHeaders(),
       body: jsonEncode({
         'action': 'create-order',
         'userId': userId,
@@ -977,7 +1032,7 @@ static Future<Map<String, dynamic>> verifyPaymentSuccess({
   try {
     final res = await _request((url) => http.post(
       Uri.parse('$url/payments?action=verify-success'),
-      headers: {'Content-Type': 'application/json'},
+      headers: defaultHeaders(),
       body: jsonEncode({
         'action': 'verify-success',
         'orderId': orderId,
@@ -1031,7 +1086,7 @@ static Future<AppointmentModel?> bookAppointment(Map<String, dynamic> data) asyn
 try {
 final res = await _request((url) => http.post(
 Uri.parse('$url/appointments'),
-headers: {'Content-Type': 'application/json'},
+headers: defaultHeaders(),
 body: jsonEncode(data),
 ));
 if (res.statusCode == 200) {
@@ -1064,8 +1119,7 @@ if (consultationId != null) params.add('consultationId=$consultationId');
 final q = params.isNotEmpty ? '?${params.join('&')}' : '';
 
 final res = await _request(
-(url) => http.get(Uri.parse('$url/prescriptions$q')),
-
+(url) => http.get(Uri.parse('$url/prescriptions$q'), headers: defaultHeaders()),
 );
 if (res.statusCode == 200) {
 final json = jsonDecode(res.body);
@@ -1122,7 +1176,7 @@ static Future<bool> createPrescription(Map<String, dynamic> data) async {
 try {
 final res = await _request((url) => http.post(
 Uri.parse('$url/prescriptions'),
-headers: {'Content-Type': 'application/json'},
+headers: defaultHeaders(),
 body: jsonEncode(data),
 ));
 return res.statusCode == 200;
@@ -1141,7 +1195,7 @@ String? paymentMethod,
 try {
 final res = await _request((url) => http.post(
 Uri.parse('$url/prescriptions/$prescriptionId/order-pharmacy'),
-headers: {'Content-Type': 'application/json'},
+headers: defaultHeaders(),
 body: jsonEncode({'address': address, 'paymentMethod': paymentMethod ?? 'wallet'}),
 ));
 return res.statusCode == 200;
@@ -1160,7 +1214,7 @@ static Future<String?> getAgoraRtcToken(String channelName, int uid) async {
 try {
 final res = await _request((url) => http.post(
 Uri.parse('$url/agora/rtc-token'),
-headers: {'Content-Type': 'application/json'},
+headers: defaultHeaders(),
 body: jsonEncode({'channelName': channelName, 'uid': uid, 'role': 'publisher'}),
 ));
 if (res.statusCode == 200) {

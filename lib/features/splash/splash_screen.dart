@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/routes/app_routes.dart';
 import '../../widgets/medicare_logo.dart';
@@ -38,9 +39,24 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     _controller.forward();
 
-    _timer = Timer(const Duration(milliseconds: 2400), () {
+    _timer = Timer(const Duration(milliseconds: 2200), () async {
+      if (!mounted) return;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final isAuth = prefs.getBool('medicare_is_authenticated') ?? false;
+        final token = prefs.getString('medicare_auth_token');
+
+        if (mounted && isAuth && token != null && token.isNotEmpty) {
+          debugPrint('🚀 [SplashScreen] Persistent session active! Routing directly to MainShell.');
+          Navigator.of(context).pushReplacementNamed(AppRoutes.mainShell);
+          return;
+        }
+      } catch (e) {
+        debugPrint('⚠️ [SplashScreen] Session check error: $e');
+      }
+
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed(AppRoutes.onboarding);
+        Navigator.of(context).pushReplacementNamed(AppRoutes.login);
       }
     });
   }

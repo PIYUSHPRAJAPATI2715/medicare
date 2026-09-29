@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
@@ -68,7 +69,9 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundImage: NetworkImage(user.avatarUrl),
+              backgroundImage: user.avatarUrl.startsWith('data:image')
+                  ? MemoryImage(base64Decode(user.avatarUrl.split(',').last)) as ImageProvider
+                  : NetworkImage(user.avatarUrl),
             ),
             const SizedBox(width: 10),
             Expanded(

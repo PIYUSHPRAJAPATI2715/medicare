@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
@@ -192,17 +193,24 @@ class AccountScreen extends ConsumerWidget {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(24),
-                      child: Image.network(
-                        user.avatarUrl,
-                        width: 60,
-                        height: 60,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => const CircleAvatar(
-                          radius: 30,
-                          backgroundColor: AppColors.primaryLight,
-                          child: Icon(Icons.person, size: 36, color: AppColors.primary),
-                        ),
-                      ),
+                      child: user.avatarUrl.startsWith('data:image')
+                          ? Image.memory(
+                              base64Decode(user.avatarUrl.split(',').last),
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover,
+                            )
+                          : Image.network(
+                              user.avatarUrl,
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const CircleAvatar(
+                                radius: 30,
+                                backgroundColor: AppColors.primaryLight,
+                                child: Icon(Icons.person, size: 36, color: AppColors.primary),
+                              ),
+                            ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(

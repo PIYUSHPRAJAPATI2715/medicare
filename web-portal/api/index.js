@@ -218,6 +218,7 @@ export default async function handler(req, res) {
         message: 'Patient login successful',
         data: {
           token: `jwt_live_${user.id}`,
+          authToken: `jwt_live_${user.id}`,
           role: user.role || 'patient',
           user: {
             ...user,
@@ -303,6 +304,7 @@ export default async function handler(req, res) {
       message: 'Patient account registered successfully on live drconnects24 network',
       data: {
         token: `jwt_live_${newUser.id}`,
+        authToken: `jwt_live_${newUser.id}`,
         user: newUser,
       },
     });
@@ -401,6 +403,25 @@ export default async function handler(req, res) {
       deleteUser(id);
       return sendJson(res, 200, { status: 200, statusCode: 200, success: true, message: 'User deleted', data: { id, deleted: true } });
     }
+  }
+
+  // 5.5. UPLOAD & PROFILE PHOTO
+  if (path === '/api/upload' || (path === '/api/users' && query.action === 'upload')) {
+    const photo = body.image || body.avatarUrl || body.data || body.imageUrl;
+    const targetUserId = body.userId || query.userId || query.id;
+    if (!photo) {
+      return sendJson(res, 400, { status: 400, statusCode: 400, success: false, message: 'Photo image data is required', data: null });
+    }
+    if (targetUserId) {
+      updateUser(targetUserId, { avatarUrl: photo });
+    }
+    return sendJson(res, 200, {
+      status: 200,
+      statusCode: 200,
+      success: true,
+      message: 'Profile photo uploaded successfully and synced with Admin',
+      data: { url: photo, avatarUrl: photo, userId: targetUserId },
+    });
   }
 
   // 6. DOCTORS (CRUD & VERIFICATION)

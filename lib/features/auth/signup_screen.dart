@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/routes/app_routes.dart';
 import '../../models/user_model.dart';
@@ -30,6 +32,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   // Patient specific
   String _selectedGender = 'Male';
   final _dobController = TextEditingController(text: '15/08/1995');
+  String? _avatarUrl;
+  final ImagePicker _picker = ImagePicker();
 
   // Doctor specific
   final _specializationController = TextEditingController();
@@ -60,6 +64,83 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     super.dispose();
   }
 
+  ImageProvider _getAvatarImage(String url) {
+    if (url.startsWith('data:image')) {
+      final base64String = url.split(',').last;
+      return MemoryImage(base64Decode(base64String));
+    }
+    return NetworkImage(url);
+  }
+
+  void _showPhotoOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Add Profile Photo', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(color: AppColors.primaryLight, shape: BoxShape.circle),
+                  child: const Icon(Icons.camera_alt_rounded, color: AppColors.primary, size: 20),
+                ),
+                title: const Text('Take Photo with Camera', style: TextStyle(fontWeight: FontWeight.w600)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(color: AppColors.primaryLight, shape: BoxShape.circle),
+                  child: const Icon(Icons.photo_library_rounded, color: AppColors.primary, size: 20),
+                ),
+                title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w600)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? file = await _picker.pickImage(
+        source: source,
+        maxWidth: 400,
+        maxHeight: 400,
+        imageQuality: 75,
+      );
+      if (file != null) {
+        final bytes = await file.readAsBytes();
+        final base64String = base64Encode(bytes);
+        setState(() {
+          _avatarUrl = 'data:image/jpeg;base64,$base64String';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    }
+  }
+
   void _handleSignup() async {
     setState(() => _isLoading = true);
 
@@ -71,6 +152,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         password: _passwordController.text.trim().isNotEmpty ? _passwordController.text.trim() : 'password123',
         gender: _selectedGender,
         dob: _dobController.text.trim(),
+        avatarUrl: _avatarUrl,
       );
 
       if (!mounted) return;
@@ -173,6 +255,48 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                           },
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              ],
+
+              if (_role == UserRole.patient) ...[
+                Center(
+                  child: Column(
+                    children: [
+                      GestureDetector(
+                        onTap: _showPhotoOptions,
+                        child: Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 44,
+                              backgroundColor: Colors.grey.shade200,
+                              backgroundImage: _avatarUrl != null
+                                  ? _getAvatarImage(_avatarUrl!)
+                                  : const NetworkImage('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400'),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 16),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextButton.icon(
+                        onPressed: _showPhotoOptions,
+                        icon: const Icon(Icons.add_a_photo_outlined, size: 14),
+                        label: const Text('Add Profile Photo (Camera/Gallery)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(height: 12),
                     ],
                   ),
                 ),
