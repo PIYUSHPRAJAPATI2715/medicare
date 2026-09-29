@@ -8,6 +8,7 @@ class SpecialtyModel {
   final IconData icon;
   final Color iconColor;
   final Color bgColor;
+  final String? imageUrl;
   final List<String> commonSymptoms;
 
   const SpecialtyModel({
@@ -18,6 +19,7 @@ class SpecialtyModel {
     required this.icon,
     required this.iconColor,
     required this.bgColor,
+    this.imageUrl,
     this.commonSymptoms = const [],
   });
 
@@ -34,22 +36,45 @@ class SpecialtyModel {
   }
 
   static IconData _parseIcon(String? iconName) {
-    switch (iconName) {
+    final lower = iconName?.toLowerCase() ?? '';
+    switch (lower) {
+      case 'sparkles':
       case 'face_retouching_natural_rounded':
+      case 'dermatology':
+      case 'skin':
         return Icons.face_retouching_natural_rounded;
+      case 'baby':
       case 'child_care_rounded':
+      case 'pediatrician':
+      case 'pediatrics':
         return Icons.child_care_rounded;
+      case 'hearthandshake':
       case 'pregnant_woman_rounded':
+      case 'gynecologist':
+      case 'gynecology':
         return Icons.pregnant_woman_rounded;
       case 'favorite_rounded':
+      case 'heart':
+      case 'activity':
+      case 'cardiologist':
+      case 'cardiology':
         return Icons.favorite_rounded;
+      case 'brain':
       case 'psychology_rounded':
+      case 'psychiatrist':
+      case 'neurology':
         return Icons.psychology_rounded;
+      case 'shield':
       case 'healing_rounded':
+      case 'wellness':
         return Icons.healing_rounded;
+      case 'eye':
       case 'visibility_rounded':
+      case 'ophthalmologist':
         return Icons.visibility_rounded;
+      case 'stethoscope':
       case 'medical_services_rounded':
+      case 'general physician':
       default:
         return Icons.medical_services_rounded;
     }
@@ -60,13 +85,15 @@ class SpecialtyModel {
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
-      doctorCount: (json['doctorCount'] as num?)?.toInt() ?? 0,
+      doctorCount: int.tryParse(json['doctorCount']?.toString() ?? '') ?? 0,
       icon: _parseIcon(json['icon']?.toString()),
       iconColor: _parseColor(json['iconColorHex']?.toString(), const Color(0xFF1A56DB)),
       bgColor: _parseColor(json['bgColorHex']?.toString(), const Color(0xFFEBF5FF)),
-      commonSymptoms: json['commonSymptoms'] != null
-          ? List<String>.from(json['commonSymptoms'])
-          : const [],
+      imageUrl: json['imageUrl']?.toString(),
+      commonSymptoms: (json['commonSymptoms'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
     );
   }
 
@@ -76,8 +103,8 @@ class SpecialtyModel {
       'name': name,
       'description': description,
       'doctorCount': doctorCount,
+      'imageUrl': imageUrl,
       'commonSymptoms': commonSymptoms,
     };
   }
 }
-

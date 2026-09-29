@@ -265,6 +265,10 @@ export function getStore() {
         if (!cachedStore.wallets) cachedStore.wallets = { ...initialWallets };
         if (!cachedStore.users) cachedStore.users = [...initialUsers];
         if (!cachedStore.doctors) cachedStore.doctors = [...initialDoctors];
+        if (!cachedStore.specialties) cachedStore.specialties = JSON.parse(JSON.stringify(initialSpecialties));
+        if (!cachedStore.hospitals) cachedStore.hospitals = JSON.parse(JSON.stringify(initialHospitals));
+        if (!cachedStore.plans) cachedStore.plans = JSON.parse(JSON.stringify(initialPlans || []));
+        if (!cachedStore.diseases) cachedStore.diseases = JSON.parse(JSON.stringify(initialDiseases || []));
         return cachedStore;
       }
     }
@@ -677,3 +681,167 @@ export function generateAgoraToken(channelName, uid, role = 'publisher') {
     role,
   };
 }
+
+// ── Catalog Helpers (Specialties, Hospitals, Plans, Diseases) ─────────────
+export function getSpecialties() {
+  return getStore().specialties || [];
+}
+
+export function addSpecialty(data) {
+  const store = getStore();
+  if (!store.specialties) store.specialties = [];
+  const newSpec = {
+    id: data.id || `s_${Date.now()}`,
+    name: data.name || 'Specialty',
+    description: data.description || 'Specialized clinical diagnosis and treatments.',
+    doctorCount: Number(data.doctorCount) || 5,
+    icon: data.icon || 'Stethoscope',
+    iconColorHex: data.iconColorHex || '#1A56DB',
+    bgColorHex: data.bgColorHex || '#EBF5FF',
+    imageUrl: data.imageUrl || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400',
+    commonSymptoms: Array.isArray(data.commonSymptoms) ? data.commonSymptoms : [],
+    ...data,
+  };
+  store.specialties.unshift(newSpec);
+  saveStore(store);
+  return newSpec;
+}
+
+export function deleteSpecialty(id) {
+  const store = getStore();
+  if (!store.specialties) store.specialties = [];
+  const idx = store.specialties.findIndex(s => s.id === id);
+  if (idx !== -1) {
+    const deleted = store.specialties.splice(idx, 1)[0];
+    saveStore(store);
+    return deleted;
+  }
+  return null;
+}
+
+export function getHospitals() {
+  return getStore().hospitals || [];
+}
+
+export function addHospital(data) {
+  const store = getStore();
+  if (!store.hospitals) store.hospitals = [];
+  const newHosp = {
+    id: data.id || `hosp_${Date.now()}`,
+    name: data.name || 'MediCare Hospital',
+    location: data.location || 'New Delhi, India',
+    rating: Number(data.rating) || 4.8,
+    reviewsCount: Number(data.reviewsCount) || 120,
+    imageUrl: data.imageUrl || 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=600',
+    facilities: Array.isArray(data.facilities) ? data.facilities : ['ICU', '24/7 Emergency', 'Pharmacy'],
+    specialties: Array.isArray(data.specialties) ? data.specialties : ['General Medicine', 'Cardiology'],
+    bedsCount: Number(data.bedsCount) || 150,
+    ambulanceContact: data.ambulanceContact || '+91 1800 123 4567',
+    isOpen247: data.isOpen247 !== false,
+    ...data,
+  };
+  store.hospitals.unshift(newHosp);
+  saveStore(store);
+  return newHosp;
+}
+
+export function deleteHospital(id) {
+  const store = getStore();
+  if (!store.hospitals) store.hospitals = [];
+  const idx = store.hospitals.findIndex(h => h.id === id);
+  if (idx !== -1) {
+    const deleted = store.hospitals.splice(idx, 1)[0];
+    saveStore(store);
+    return deleted;
+  }
+  return null;
+}
+
+export function getPlans() {
+  return getStore().plans || [];
+}
+
+export function addPlan(data) {
+  const store = getStore();
+  if (!store.plans) store.plans = [];
+  const newPlan = {
+    id: data.id || `plan_${Date.now()}`,
+    name: data.name || 'Care Pass',
+    tagline: data.tagline || 'Essential healthcare coverage',
+    price: Number(data.price) || 199,
+    originalPrice: Number(data.originalPrice) || 499,
+    durationDays: Number(data.durationDays) || 30,
+    durationLabel: data.durationLabel || '1 Month',
+    consultationLimit: Number(data.consultationLimit) || 3,
+    isPopular: !!data.isPopular,
+    badgeText: data.badgeText || null,
+    isActive: data.isActive !== false,
+    subscribersCount: Number(data.subscribersCount) || 0,
+    features: Array.isArray(data.features) ? data.features : [
+      'Doctor Consultations included',
+      '24/7 Doctor Chat Support',
+      'Digital Prescriptions',
+    ],
+    ...data,
+  };
+  store.plans.push(newPlan);
+  saveStore(store);
+  return newPlan;
+}
+
+export function updatePlan(id, data) {
+  const store = getStore();
+  if (!store.plans) store.plans = [];
+  const idx = store.plans.findIndex(p => p.id === id);
+  if (idx !== -1) {
+    store.plans[idx] = { ...store.plans[idx], ...data };
+    saveStore(store);
+    return store.plans[idx];
+  }
+  return null;
+}
+
+export function deletePlan(id) {
+  const store = getStore();
+  if (!store.plans) store.plans = [];
+  const idx = store.plans.findIndex(p => p.id === id);
+  if (idx !== -1) {
+    const deleted = store.plans.splice(idx, 1)[0];
+    saveStore(store);
+    return deleted;
+  }
+  return null;
+}
+
+export function getDiseases() {
+  return getStore().diseases || [];
+}
+
+export function addDisease(data) {
+  const store = getStore();
+  if (!store.diseases) store.diseases = [];
+  const newDis = {
+    id: data.id || `dis_${Date.now()}`,
+    name: data.name || 'Common Condition',
+    specialty: data.specialty || 'General Physician',
+    symptomCount: data.symptomCount || '5 Symptoms',
+    description: data.description || '',
+    ...data,
+  };
+  store.diseases.unshift(newDis);
+  saveStore(store);
+  return newDis;
+}
+
+export function deleteDisease(id) {
+  const store = getStore();
+  if (!store.diseases) store.diseases = [];
+  const idx = store.diseases.findIndex(d => d.id === id);
+  if (idx !== -1) {
+    const deleted = store.diseases.splice(idx, 1)[0];
+    saveStore(store);
+    return deleted;
+  }
+  return null;
+}
+

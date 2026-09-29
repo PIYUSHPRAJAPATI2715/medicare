@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { fetchSpecialties } from '../../services/api';
+import { fetchSpecialties, createSpecialty, deleteSpecialty } from '../../services/api';
 import { initialSpecialties } from '../../data/mockData';
 import ImageUpload from '../../components/ImageUpload';
-import { Stethoscope, Plus, Search, X, Check, Activity, Heart, Sparkles, Brain, Baby, Eye, Shield } from 'lucide-react';
+import { Stethoscope, Plus, Search, X, Check, Activity, Heart, Sparkles, Brain, Baby, Eye, Shield, Trash2 } from 'lucide-react';
 
 const SPECIALTY_PRESETS = [
   { title: 'General Medicine', url: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400' },
@@ -36,6 +36,7 @@ export default function SpecialtiesPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -47,18 +48,21 @@ export default function SpecialtiesPage() {
     imageUrl: SPECIALTY_PRESETS[0].url,
   });
 
-  useEffect(() => {
+  const loadLiveSpecialties = () => {
     fetchSpecialties().then(res => {
       if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
-        setSpecialties(prev => {
-          const customIds = new Set(prev.filter(s => s.id.startsWith('custom_')).map(s => s.id));
-          const customs = prev.filter(s => customIds.has(s.id));
-          const existingIds = new Set(customs.map(s => s.id));
-          const incoming = res.data.filter(s => !existingIds.has(s.id));
-          return [...customs, ...incoming];
-        });
+        setSpecialties(res.data);
+        try {
+          localStorage.setItem('drconnects24_custom_specialties', JSON.stringify(res.data));
+        } catch { /* ignore */ }
       }
     }).catch(console.error);
+  };
+
+  useEffect(() => {
+    loadLiveSpecialties();
+    const interval = setInterval(loadLiveSpecialties, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleOpenModal = () => {
@@ -73,24 +77,32 @@ export default function SpecialtiesPage() {
     setIsModalOpen(true);
   };
 
-  const handleSaveSpecialty = (e) => {
+  const handleSaveSpecialty = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) {
       alert('Please enter a specialty name.');
       return;
     }
 
+    setIsSaving(true);
     const newSpecialty = {
-      id: `custom_s_${Date.now()}`,
+      id: `s_${Date.now()}`,
       name: formData.name.trim(),
       description: formData.description.trim() || 'Specialized clinical diagnosis and treatments.',
       doctorCount: Number(formData.doctorCount) || 5,
       bgColorHex: formData.bgColorHex,
       iconColorHex: formData.iconColorHex,
       imageUrl: formData.imageUrl || DEFAULT_SPECIALTY_IMG,
+      icon: 'Stethoscope',
     };
 
-    const updated = [newSpecialty, ...specialties];
+    try {
+      await createSpecialty(newSpecialty);
+    } catch (err) {
+      console.warn('API save specialty failed:', err);
+    }
+
+    const updated = [newSpecialty, ...specialties.filter(s => s.id !== newSpecialty.id)];
     setSpecialties(updated);
     try {
       localStorage.setItem('drconnects24_custom_specialties', JSON.stringify(updated));
@@ -98,7 +110,24 @@ export default function SpecialtiesPage() {
       console.warn('LocalStorage save failed:', err);
     }
 
+    setIsSaving(false);
     setIsModalOpen(false);
+  };
+
+  const handleDeleteSpecialty = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to delete "${name}"?`)) return;
+    try {
+      await deleteSpecialty(id);
+    } catch (err) {
+      console.warn('API delete failed:', err);
+    }
+    const updated = specialties.filter(s => s.id !== id);
+    setSpecialties(updated);
+    try {
+      localStorage.setItem('drconnects24_custom_specialties', JSON.stringify(updated));
+    } catch (err) {
+      console.warn('LocalStorage save failed:', err);
+    }
   };
 
   const filtered = specialties.filter(s =>
@@ -173,11 +202,18 @@ export default function SpecialtiesPage() {
                     >
                       <Stethoscope className="w-5 h-5" />
                     </div>
-                    {!spec.imageUrl && (
+                    <div className="flex items-center gap-2">
                       <span className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
                         {spec.doctorCount || 10} Doctors
                       </span>
-                    )}
+                      <button
+                        onClick={() => handleDeleteSpecialty(spec.id, spec.name)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                        title="Delete Specialty"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <h3 className="text-base font-extrabold text-slate-900">{spec.name}</h3>

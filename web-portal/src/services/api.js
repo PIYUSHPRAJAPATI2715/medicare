@@ -141,7 +141,28 @@ export const deleteUser = (id) =>
 
 // Specialties & Hospitals
 export const fetchSpecialties = () => safeFetch('/specialties', initialSpecialties);
+export const createSpecialty = (data) =>
+  api.post('/specialties', data)
+    .then(res => res.data)
+    .catch(err => {
+      console.warn('API createSpecialty failed, local fallback:', err);
+      return { success: true, data };
+    });
+export const deleteSpecialty = (id) =>
+  api.delete(`/specialties?id=${id}`)
+    .then(res => res.data);
+
 export const fetchHospitals = () => safeFetch('/hospitals', initialHospitals);
+export const createHospital = (data) =>
+  api.post('/hospitals', data)
+    .then(res => res.data)
+    .catch(err => {
+      console.warn('API createHospital failed, local fallback:', err);
+      return { success: true, data };
+    });
+export const deleteHospital = (id) =>
+  api.delete(`/hospitals?id=${id}`)
+    .then(res => res.data);
 
 // Appointments
 export const fetchAppointments = () => safeFetch('/appointments', initialAppointments);

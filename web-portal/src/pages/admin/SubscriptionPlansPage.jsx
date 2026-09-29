@@ -13,6 +13,7 @@ import {
   Lock,
   Sparkles
 } from 'lucide-react';
+import { fetchPlans, createPlan, updatePlan, deletePlan } from '../../services/api';
 
 const INITIAL_PLANS = [
   {
@@ -98,6 +99,7 @@ export default function SubscriptionPlansPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     tagline: '',
@@ -112,9 +114,22 @@ export default function SubscriptionPlansPage() {
     featuresText: ''
   });
 
+  const loadLivePlans = () => {
+    fetchPlans().then(res => {
+      if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setPlans(res.data);
+        try {
+          localStorage.setItem('medicare_subscription_plans', JSON.stringify(res.data));
+        } catch { /* ignore */ }
+      }
+    }).catch(console.error);
+  };
+
   useEffect(() => {
-    localStorage.setItem('medicare_subscription_plans', JSON.stringify(plans));
-  }, [plans]);
+    loadLivePlans();
+    const interval = setInterval(loadLivePlans, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const totalSubscribers = plans.reduce((acc, p) => acc + (p.subscribersCount || 0), 0);
   const estimatedRevenue = plans.reduce((acc, p) => acc + (p.price * (p.subscribersCount || 0)), 0);
@@ -155,20 +170,40 @@ export default function SubscriptionPlansPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this subscription plan?')) {
-      setPlans(plans.filter((p) => p.id !== id));
+      try {
+        await deletePlan(id);
+      } catch (err) {
+        console.warn('API delete plan failed:', err);
+      }
+      const updated = plans.filter((p) => p.id !== id);
+      setPlans(updated);
+      try {
+        localStorage.setItem('medicare_subscription_plans', JSON.stringify(updated));
+      } catch { /* ignore */ }
     }
   };
 
-  const handleToggleActive = (id) => {
-    setPlans(
-      plans.map((p) => (p.id === id ? { ...p, isActive: !p.isActive } : p))
-    );
+  const handleToggleActive = async (id) => {
+    const target = plans.find(p => p.id === id);
+    if (!target) return;
+    const newActive = !target.isActive;
+    try {
+      await updatePlan(id, { ...target, isActive: newActive });
+    } catch (err) {
+      console.warn('API toggle plan failed:', err);
+    }
+    const updated = plans.map((p) => (p.id === id ? { ...p, isActive: newActive } : p));
+    setPlans(updated);
+    try {
+      localStorage.setItem('medicare_subscription_plans', JSON.stringify(updated));
+    } catch { /* ignore */ }
   };
 
-  const handleSavePlan = (e) => {
+  const handleSavePlan = async (e) => {
     e.preventDefault();
+    setIsSaving(true);
     const features = formData.featuresText
       .split('\n')
       .map((f) => f.trim())
@@ -190,12 +225,23 @@ export default function SubscriptionPlansPage() {
       features: features.length > 0 ? features : ['Unlimited Doctor Consultations', 'Free Digital Rx']
     };
 
+    try {
+      if (editingPlan) {
+        await updatePlan(editingPlan.id, planPayload);
+      } else {
+        await createPlan(planPayload);
+      }
+    } catch (err) {
+      console.warn('API save plan failed:', err);
+    }
+
     if (editingPlan) {
       setPlans(plans.map((p) => (p.id === editingPlan.id ? planPayload : p)));
     } else {
       setPlans([...plans, planPayload]);
     }
 
+    setIsSaving(false);
     setIsModalOpen(false);
   };
 

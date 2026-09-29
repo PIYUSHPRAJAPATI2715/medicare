@@ -24,7 +24,9 @@ final allDiseasesProvider = FutureProvider<List<DiseaseModel>>((ref) async {
 final specialtiesListProvider = Provider<List<SpecialtyModel>>((ref) {
   final query = ref.watch(specialtySearchQueryProvider).toLowerCase().trim();
   final asyncSpecialties = ref.watch(allSpecialtiesProvider);
-  final list = asyncSpecialties.value ?? MockData.specialties;
+  final list = (asyncSpecialties.value != null && asyncSpecialties.value!.isNotEmpty)
+      ? asyncSpecialties.value!
+      : MockData.specialties;
 
   if (query.isEmpty) return list;
   return list.where((s) {

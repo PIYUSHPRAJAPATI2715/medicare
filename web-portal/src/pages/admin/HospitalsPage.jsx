@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { fetchHospitals } from '../../services/api';
+import { fetchHospitals, createHospital, deleteHospital } from '../../services/api';
 import { initialHospitals } from '../../data/mockData';
 import ImageUpload from '../../components/ImageUpload';
-import { Building2, MapPin, Star, Plus, Phone, BedDouble, AlertCircle, X, Check, Search } from 'lucide-react';
+import { Building2, MapPin, Star, Plus, Phone, BedDouble, AlertCircle, X, Check, Search, Trash2 } from 'lucide-react';
 
 const HOSPITAL_PRESETS = [
   { title: 'Super Speciality Wing', url: 'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800' },
@@ -25,6 +25,7 @@ export default function HospitalsPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -37,19 +38,21 @@ export default function HospitalsPage() {
     imageUrl: HOSPITAL_PRESETS[0].url,
   });
 
-  useEffect(() => {
+  const loadLiveHospitals = () => {
     fetchHospitals().then(res => {
       if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
-        // Merge without overwriting user newly added ones
-        setHospitals(prev => {
-          const customIds = new Set(prev.filter(h => h.id.startsWith('custom_')).map(h => h.id));
-          const customs = prev.filter(h => customIds.has(h.id));
-          const existingIds = new Set(customs.map(h => h.id));
-          const incoming = res.data.filter(h => !existingIds.has(h.id));
-          return [...customs, ...incoming];
-        });
+        setHospitals(res.data);
+        try {
+          localStorage.setItem('drconnects24_custom_hospitals', JSON.stringify(res.data));
+        } catch { /* ignore */ }
       }
     }).catch(console.error);
+  };
+
+  useEffect(() => {
+    loadLiveHospitals();
+    const interval = setInterval(loadLiveHospitals, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleOpenModal = () => {
@@ -65,25 +68,37 @@ export default function HospitalsPage() {
     setIsModalOpen(true);
   };
 
-  const handleSaveHospital = (e) => {
+  const handleSaveHospital = async (e) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.address.trim()) {
       alert('Please enter both hospital name and address.');
       return;
     }
 
+    setIsSaving(true);
     const newHospital = {
-      id: `custom_h_${Date.now()}`,
+      id: `hosp_${Date.now()}`,
       name: formData.name.trim(),
       address: formData.address.trim(),
+      location: formData.address.trim(),
       phone: formData.phone.trim() || '+91 141 000 0000',
       beds: Number(formData.beds) || 100,
+      bedsCount: Number(formData.beds) || 100,
       rating: Number(formData.rating) || 4.5,
       emergency: Boolean(formData.emergency),
+      isOpen247: Boolean(formData.emergency),
       imageUrl: formData.imageUrl || DEFAULT_HOSPITAL_IMG,
+      facilities: ['ICU', 'Emergency', 'Pharmacy'],
+      specialties: ['General Medicine', 'Cardiology', 'Surgery'],
     };
 
-    const updated = [newHospital, ...hospitals];
+    try {
+      await createHospital(newHospital);
+    } catch (err) {
+      console.warn('API save hospital failed:', err);
+    }
+
+    const updated = [newHospital, ...hospitals.filter(h => h.id !== newHospital.id)];
     setHospitals(updated);
     try {
       localStorage.setItem('drconnects24_custom_hospitals', JSON.stringify(updated));
@@ -91,7 +106,24 @@ export default function HospitalsPage() {
       console.warn('LocalStorage save failed:', err);
     }
 
+    setIsSaving(false);
     setIsModalOpen(false);
+  };
+
+  const handleDeleteHospital = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to delete "${name}"?`)) return;
+    try {
+      await deleteHospital(id);
+    } catch (err) {
+      console.warn('API delete hospital failed:', err);
+    }
+    const updated = hospitals.filter(h => h.id !== id);
+    setHospitals(updated);
+    try {
+      localStorage.setItem('drconnects24_custom_hospitals', JSON.stringify(updated));
+    } catch (err) {
+      console.warn('LocalStorage save failed:', err);
+    }
   };
 
   const filtered = hospitals.filter(h =>
@@ -148,10 +180,17 @@ export default function HospitalsPage() {
                     e.currentTarget.src = DEFAULT_HOSPITAL_IMG;
                   }}
                 />
-                <div className="absolute top-3 right-3 flex gap-1.5">
+                <div className="absolute top-3 right-3 flex gap-1.5 items-center">
                   <span className="flex items-center gap-1 text-[11px] font-extrabold text-amber-700 bg-white/95 backdrop-blur-sm px-2.5 py-1 rounded-full shadow-sm border border-amber-200">
                     <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" /> {h.rating || 4.8}
                   </span>
+                  <button
+                    onClick={() => handleDeleteHospital(h.id, h.name)}
+                    className="p-1.5 bg-white/95 backdrop-blur-sm text-slate-400 hover:text-red-600 rounded-full shadow-sm border border-slate-200 transition"
+                    title="Delete Hospital"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
                 {h.emergency && (
                   <div className="absolute top-3 left-3">

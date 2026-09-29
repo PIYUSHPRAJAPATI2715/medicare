@@ -26,6 +26,19 @@ import {
   addPrescription,
   getAnalytics,
   generateAgoraToken,
+  getSpecialties,
+  addSpecialty,
+  deleteSpecialty,
+  getHospitals,
+  addHospital,
+  deleteHospital,
+  getPlans,
+  addPlan,
+  updatePlan,
+  deletePlan,
+  getDiseases,
+  addDisease,
+  deleteDisease,
 } from './_store.js';
 
 function sendJson(res, statusCode, payload) {
@@ -777,23 +790,63 @@ export default async function handler(req, res) {
   }
 
   // 11. CATALOGS (Specialties, Hospitals, Plans, Diseases)
-  if (path === '/api/specialties') {
-    const list = getStore().specialties || [];
+  if (path === '/api/specialties' || path.startsWith('/api/specialties/')) {
+    const id = query.id || body.id || (path !== '/api/specialties' ? path.replace('/api/specialties/', '') : null);
+    if (method === 'DELETE' || query.action === 'delete') {
+      const deleted = deleteSpecialty(id);
+      return sendJson(res, 200, { status: 200, statusCode: 200, success: true, message: 'Specialty deleted', data: deleted });
+    }
+    if (method === 'POST') {
+      const created = addSpecialty(body);
+      return sendJson(res, 201, { status: 201, statusCode: 201, success: true, message: 'Specialty created', data: created });
+    }
+    const list = getSpecialties();
     return sendJson(res, 200, { status: 200, statusCode: 200, success: true, count: list.length, data: list });
   }
 
-  if (path === '/api/hospitals') {
-    const list = getStore().hospitals || [];
+  if (path === '/api/hospitals' || path.startsWith('/api/hospitals/')) {
+    const id = query.id || body.id || (path !== '/api/hospitals' ? path.replace('/api/hospitals/', '') : null);
+    if (method === 'DELETE' || query.action === 'delete') {
+      const deleted = deleteHospital(id);
+      return sendJson(res, 200, { status: 200, statusCode: 200, success: true, message: 'Hospital deleted', data: deleted });
+    }
+    if (method === 'POST') {
+      const created = addHospital(body);
+      return sendJson(res, 201, { status: 201, statusCode: 201, success: true, message: 'Hospital created', data: created });
+    }
+    const list = getHospitals();
     return sendJson(res, 200, { status: 200, statusCode: 200, success: true, count: list.length, data: list });
   }
 
-  if (path === '/api/plans') {
-    const list = getStore().plans || [];
+  if (path === '/api/plans' || path.startsWith('/api/plans/')) {
+    const id = query.id || body.id || (path !== '/api/plans' ? path.replace('/api/plans/', '') : null);
+    if (method === 'DELETE' || query.action === 'delete') {
+      const deleted = deletePlan(id);
+      return sendJson(res, 200, { status: 200, statusCode: 200, success: true, message: 'Plan deleted', data: deleted });
+    }
+    if (method === 'PUT' || (method === 'POST' && (query.action === 'update' || body.action === 'update'))) {
+      const updated = updatePlan(id, body);
+      return sendJson(res, 200, { status: 200, statusCode: 200, success: true, message: 'Plan updated', data: updated });
+    }
+    if (method === 'POST') {
+      const created = addPlan(body);
+      return sendJson(res, 201, { status: 201, statusCode: 201, success: true, message: 'Plan created', data: created });
+    }
+    const list = getPlans();
     return sendJson(res, 200, { status: 200, statusCode: 200, success: true, count: list.length, data: list });
   }
 
-  if (path === '/api/diseases') {
-    const list = getStore().diseases || [];
+  if (path === '/api/diseases' || path.startsWith('/api/diseases/')) {
+    const id = query.id || body.id || (path !== '/api/diseases' ? path.replace('/api/diseases/', '') : null);
+    if (method === 'DELETE' || query.action === 'delete') {
+      const deleted = deleteDisease(id);
+      return sendJson(res, 200, { status: 200, statusCode: 200, success: true, message: 'Disease deleted', data: deleted });
+    }
+    if (method === 'POST') {
+      const created = addDisease(body);
+      return sendJson(res, 201, { status: 201, statusCode: 201, success: true, message: 'Disease created', data: created });
+    }
+    const list = getDiseases();
     return sendJson(res, 200, { status: 200, statusCode: 200, success: true, count: list.length, data: list });
   }
 
