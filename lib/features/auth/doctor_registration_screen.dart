@@ -777,8 +777,8 @@ class _DoctorRegistrationScreenState
           name: docName,
           email: _emailController.text.trim(),
           phone: _phoneController.text.trim(),
-          gender: _selectedGender,
-          dateOfBirth: _dob != null ? DateFormat('yyyy-MM-dd').format(_dob!) : '1990-01-01',
+          gender: _gender,
+          dateOfBirth: _dateOfBirth != null ? DateFormat('yyyy-MM-dd').format(_dateOfBirth!) : '1990-01-01',
           specialty: _selectedSpecialty ?? 'General Physician',
           subSpecialty: _subSpecialtyController.text.trim(),
           qualification: _postGradDegree != 'None' && _postGradDegree.isNotEmpty
