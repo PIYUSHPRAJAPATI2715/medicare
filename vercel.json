@@ -1,8 +1,16 @@
 {
-  "buildCommand": "if [ -d \"web-portal\" ]; then (cd web-portal && npm run build); else npm run build; fi",
+  "buildCommand": "cd web-portal && npm install && npm run build",
   "outputDirectory": "web-portal/dist",
   "framework": "vite",
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/api",
+      "destination": "/api/index.js"
+    },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"

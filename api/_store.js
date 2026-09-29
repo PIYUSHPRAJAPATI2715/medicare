@@ -8,7 +8,7 @@ import {
   initialHospitals,
   initialAppointments,
   initialDiseases,
-} from './data.js';
+} from './_data.js';
 
 const initialPlans = [
   {

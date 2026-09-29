@@ -928,7 +928,7 @@ static Future<Map<String, dynamic>> payWithWallet({
   } catch (e) {
     debugPrint('ApiService payWithWallet error: $e');
     return _errorResponse(e);
-}
+}}
 
 // =========================================================================
 // 6. PAYMENTS & VERIFICATION
